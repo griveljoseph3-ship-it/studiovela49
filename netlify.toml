@@ -1,9 +1,12 @@
-# Istruzioni per Netlify: NON serve modificarlo.
-# A ogni pubblicazione Netlify esegue "node build.js",
-# che crea il sito finito nella cartella "dist".
+# Netlify: sito nella cartella principale del dominio (nessuna sottocartella).
+# A ogni pubblicazione esegue "node build.js" e pubblica "dist".
 [build]
   command = "node build.js"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
+  PERCORSO_BASE = ""
+  # Quando il sito va sul dominio vero: metti l'indirizzo e togli il noindex
+  # SITO_URL = "https://www.studiovela49.it"
+  # ANTEPRIMA = "false"

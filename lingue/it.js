@@ -377,7 +377,7 @@ module.exports = {
   errore: {
     titolo: "Questa pagina non esiste.",
     frase: "Forse l'indirizzo è cambiato con il nuovo sito. Riparti dalla home o dai servizi.",
-    altro: "Page not found · Page introuvable", altroLingua: "en",
+    altro: "<span lang=\"en\">Page not found</span> · <span lang=\"fr\">Page introuvable</span>",
     torna: "Torna alla home",
   },
 };

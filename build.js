@@ -826,7 +826,7 @@ ${scala({ evidenzia: chiave === "grazie" ? "A4" : "G", classe: "scala--mini" })}
 ${titolo("h1", p.titolo, { classe: "h1 h1--medio" })}
 <p class="intro">${fmt(p.frase)}</p>
 ${p.mail ? `<p class="nota messaggio__mail" hidden>${fmt(p.mail)}</p>` : ""}
-${p.altro ? `<p lang="${p.altroLingua || ""}" class="nota">${p.altro}</p>` : ""}
+${p.altro ? `<p class="nota">${p.altro}</p>` : ""}
 <p class="messaggio__azioni">${pulsante(url(lingua, "home"), p.torna)} ${linkFreccia(url(lingua, "servizi"), t.ui.tuttiServizi)}</p>
 </section>`;
   pagina(lingua, chiave, corpo, { noindex: true, file });
