@@ -213,9 +213,10 @@ body.menu-aperto { overflow: hidden; }
 @media (min-width: 960px) { .barra { display: none; } }
 
 /* ---------- 10. BRICIOLE ---------- */
-.briciole ol { display: flex; flex-wrap: wrap; gap: .25rem .5rem; font-size: var(--t-small); color: var(--testo-soft); margin-bottom: var(--s-4); }
-.briciole li + li::before { content: "/"; margin-right: .5rem; color: var(--linea); }
-.briciole a { display: inline-block; padding-block: .6rem; }
+.briciole ol { display: flex; flex-wrap: wrap; align-items: center; gap: 0 .5rem; font-size: var(--t-small); color: var(--testo-soft); margin-bottom: var(--s-4); }
+.briciole li { display: flex; align-items: center; min-height: 2.75rem; }
+.briciole li + li::before { content: "/"; margin-right: .5rem; color: var(--testo-soft); }
+.briciole a { display: inline-flex; align-items: center; min-height: 2.75rem; }
 
 /* ---------- 11. MOVIMENTO (solo con JS e senza "riduci movimento") ---------- */
 @media (prefers-reduced-motion: no-preference) {
