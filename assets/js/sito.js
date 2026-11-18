@@ -59,12 +59,19 @@
   if (ridotto || !("IntersectionObserver" in window)) {
     elementi.forEach(function (el) { el.classList.add("visibile"); });
   } else {
+    // Le foto nascoste con clip-path non "intersecano": si osserva il loro contenitore
     var osservatore = new IntersectionObserver(function (voci) {
       voci.forEach(function (v) {
-        if (v.isIntersecting) { v.target.classList.add("visibile"); osservatore.unobserve(v.target); }
+        if (!v.isIntersecting) return;
+        var el = v.target.__rivela || v.target;
+        el.classList.add("visibile"); osservatore.unobserve(v.target);
       });
     }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
-    elementi.forEach(function (el) { osservatore.observe(el); });
+    elementi.forEach(function (el) {
+      var t = el.dataset.rivela === "foto" && el.parentElement ? el.parentElement : el;
+      if (t !== el) t.__rivela = el;
+      osservatore.observe(t);
+    });
     // il titolo della prima schermata entra subito
     document.querySelectorAll("h1[data-rivela]").forEach(function (el) { requestAnimationFrame(function () { el.classList.add("visibile"); }); });
   }
@@ -98,8 +105,9 @@
           righe.push((etichetta ? etichetta.textContent.replace("*", "").trim() : k) + ": " + valore);
         });
         var href = "mailto:" + form.dataset.email + "?subject=" + encodeURIComponent(form.dataset.oggetto) + "&body=" + encodeURIComponent(righe.join("\n"));
-        window.location.href = href;
-        setTimeout(function () { window.location.href = form.dataset.grazie + "?email=1"; }, 1200);
+        // L'email si apre dalla pagina Grazie (così la navigazione verso "Grazie" non si blocca)
+        try { sessionStorage.setItem("sv49-mailto", href); } catch (err) { window.location.href = href; return; }
+        window.location.href = form.dataset.grazie + "?email=1";
         return;
       }
       if (tipo === "netlify") { form.submit(); return; }
@@ -113,6 +121,11 @@
   // pagina Grazie dopo l'email già compilata
   if (location.search.indexOf("email=1") > -1) {
     var m = document.querySelector(".messaggio__mail"); if (m) m.hidden = false;
+    var pronto = null; try { pronto = sessionStorage.getItem("sv49-mailto"); sessionStorage.removeItem("sv49-mailto"); } catch (err) {}
+    if (pronto && m) {
+      var a = m.querySelector("a"); if (a) a.href = pronto;
+      setTimeout(function () { window.location.href = pronto; }, 300);
+    }
   }
 
   /* ---------- 5. MAPPA AL CLIC ---------- */

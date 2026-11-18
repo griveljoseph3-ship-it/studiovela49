@@ -210,6 +210,7 @@ body.menu-aperto { overflow: hidden; }
 .barra a + a { border-left: 1px solid rgba(255, 255, 255, .12); }
 .barra .barra__principale { flex: 1.3; background: var(--ambra); color: var(--inchiostro); border: 0; }
 .barra .icona { width: 1.3rem; height: 1.3rem; }
+.barra a > span { display: block; height: .8rem; line-height: .8rem; overflow: hidden; white-space: nowrap; }
 @media (min-width: 960px) { .barra { display: none; } }
 
 /* ---------- 10. BRICIOLE ---------- */
@@ -360,8 +361,9 @@ body.menu-aperto { overflow: hidden; }
 
 /* 7. Fascia scura con i valori */
 .valori { background: var(--inchiostro); color: var(--carta); padding-block: var(--sezione); }
-.valori__parole li { display: flex; align-items: baseline; gap: var(--s-3); padding-block: var(--s-2); border-bottom: 1px solid rgba(255, 255, 255, .12); font: 600 clamp(2.25rem, 1rem + 6vw, 7rem)/1 var(--f-titoli); letter-spacing: -.045em; }
-.valori__parole li:nth-child(2) { padding-left: 8vw; } .valori__parole li:nth-child(3) { padding-left: 16vw; } .valori__parole li:nth-child(4) { padding-left: 4vw; color: var(--ambra); }
+.valori__parole li { display: flex; align-items: baseline; gap: var(--s-3); padding-block: var(--s-2); border-bottom: 1px solid rgba(255, 255, 255, .12); font: 600 clamp(1.75rem, .6rem + 6.4vw, 7rem)/1 var(--f-titoli); letter-spacing: -.045em; overflow-wrap: anywhere; }
+.valori__parole li:nth-child(4) { color: var(--ambra); }
+@media (min-width: 720px) { .valori__parole li:nth-child(2) { padding-left: 8vw; } .valori__parole li:nth-child(3) { padding-left: 16vw; } .valori__parole li:nth-child(4) { padding-left: 4vw; } }
 .valori__n { font: 600 .85rem/1 var(--f-testo); letter-spacing: .1em; color: var(--su-scuro-soft); }
 .valori__frase { margin-top: var(--s-5); max-width: 40ch; font-size: var(--t-intro); color: var(--su-scuro-soft); }
 .valori--compatti .valori__parole li { font-size: clamp(1.75rem, 1rem + 3.5vw, 4.5rem); }
@@ -625,7 +627,7 @@ body.menu-aperto { overflow: hidden; }
 .mappa iframe { width: 100%; height: 26rem; border: 0; }
 
 /* Crediti */
-.tabella-scorre { overflow-x: auto; }
+.tabella-scorre { position: relative; overflow-x: auto; }
 .crediti { width: 100%; border-collapse: collapse; font-size: .95rem; }
 .crediti th, .crediti td { padding: .75rem .5rem; border-bottom: 1px solid var(--linea); text-align: left; vertical-align: middle; }
 .crediti td:first-child { width: 5rem; }

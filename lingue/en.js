@@ -369,7 +369,7 @@ module.exports = {
   grazie: {
     titolo: "Thank you, request received.",
     frase: "We will get back to you as soon as possible with a clear quote. Response time [DA CONFERMARE]. If it is urgent, call +39 339 270 9272.",
-    mail: "We have prepared the email in your mail app: remember to press Send.",
+    mail: "We have prepared the email in your mail app: remember to press Send. <a href=\"#\">Open the email again</a>",
     torna: "Back to the home page",
   },
 

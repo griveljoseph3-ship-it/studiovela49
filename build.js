@@ -366,7 +366,7 @@ function paginaHome(lingua) {
     const g = h.pubblici[k];
     return `<div class="pubblico${scuro ? " pubblico--scuro" : ""}" data-rivela="su">
 ${eti(g.eti)}
-<h3 class="h2">${fmt(g.titolo)}</h3>
+<h2 class="h2">${fmt(g.titolo)}</h2>
 <p class="intro">${fmt(g.frase)}</p>
 <ul class="pubblico__voci">${g.voci.map((v) => `<li><a href="${url(lingua, v)}"><span>${esc(t.pagine[v].menu)}</span>${icona("freccia")}</a></li>`).join("")}</ul>
 ${pulsante(url(lingua, g.cta[0]) + (g.cta[0] === "contatti" ? "#modulo" : ""), g.cta[1], scuro ? "" : "pulsante--inchiostro")}

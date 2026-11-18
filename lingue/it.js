@@ -370,7 +370,7 @@ module.exports = {
   grazie: {
     titolo: "Grazie, richiesta ricevuta.",
     frase: "Ti rispondiamo il prima possibile con un preventivo chiaro. Tempi di risposta [DA CONFERMARE]. Se è urgente, chiama il +39 339 270 9272.",
-    mail: "Abbiamo preparato l'email nel tuo programma di posta: ricordati di premere Invia.",
+    mail: "Abbiamo preparato l'email nel tuo programma di posta: ricordati di premere Invia. <a href=\"#\">Riapri l'email</a>",
     torna: "Torna alla home",
   },
 
