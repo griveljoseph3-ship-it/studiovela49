@@ -1,0 +1,9 @@
+# Istruzioni per Netlify: NON serve modificarlo.
+# A ogni pubblicazione Netlify esegue "node build.js",
+# che crea il sito finito nella cartella "dist".
+[build]
+  command = "node build.js"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
