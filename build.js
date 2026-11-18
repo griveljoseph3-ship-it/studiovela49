@@ -1,11 +1,16 @@
 /* =====================================================================
-   MOTORE DEL SITO  —  NON SERVE MODIFICARE QUESTO FILE
+   MOTORE DEL SITO StudioVela49  —  di solito non serve modificarlo
    =====================================================================
-   Netlify lo esegue a ogni pubblicazione (vedi netlify.toml).
-   Legge dati-cliente.js e i file in lingue/, poi crea nella cartella
-   dist/ tutte le pagine HTML in tutte le lingue, più sitemap.xml,
-   robots.txt, _redirects e _headers.
-   Usa solo Node.js, senza librerie esterne.
+   Legge dati-cliente.js e i testi in lingue/ (it.js, en.js, fr.js)
+   e crea in dist/ tutte le pagine HTML in tutte le lingue, più
+   sitemap.xml, robots.txt, _redirects (Netlify), .htaccess (Aruba)
+   e i rimandi dai vecchi indirizzi .php.
+   Solo Node.js (20 o più), nessuna libreria.
+
+   Variabili facoltative (le usa netlify.toml):
+     PERCORSO_BASE=""   sito nella cartella principale del dominio
+     SITO_URL="https://www.studiovela49.it"
+     ANTEPRIMA=false    toglie il "noindex" (solo quando è il sito vero)
    ===================================================================== */
 "use strict";
 
@@ -15,968 +20,896 @@ const path = require("path");
 const RADICE = __dirname;
 const USCITA = path.join(RADICE, "dist");
 const C = require("./dati-cliente.js");
-const VERSIONE = Date.now().toString(36); // evita che il browser usi CSS/JS vecchi
+const LOGO = require("./motore/logo-tracciati.json");
+const FOTO = JSON.parse(fs.readFileSync(path.join(RADICE, "assets/img/foto/indice.json"), "utf8"));
+const VERSIONE = Date.now().toString(36);
 const avvisi = [];
-const STILI = require("./motore/stili.js");
-const DISEGNI = require("./motore/disegni.js");
-const segnapostoUsati = [];
 
-/* ---------------------------------------------------------------
-   STRUMENTI DI BASE
-   --------------------------------------------------------------- */
-const esc = (s) => String(s ?? "")
-  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-const togliHtml = (s) => String(s ?? "").replace(/<[^>]*>/g, "");
-const sitoUrl = C.sitoUrl.replace(/\/+$/, "");
-const assoluto = (p) => sitoUrl + p;
-const slug = (s) => String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const env = process.env;
+const BASE = (env.PERCORSO_BASE ?? C.percorsoBase ?? "").replace(/\/+$/, "");
+const SITO = (env.SITO_URL || C.sitoUrl).replace(/\/+$/, "");
+const ANTEPRIMA = env.ANTEPRIMA ? env.ANTEPRIMA !== "false" : C.anteprima !== false;
 
-function scriviFile(relativo, contenuto) {
-  const dest = path.join(USCITA, relativo);
+/* ---------- strumenti ---------- */
+const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const testo = (s) => String(s ?? "").replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+const senzaDC = (s) => testo(s).replace(/\s*\[DA CONFERMARE[^\]]*\]\s*/g, " ").trim();
+// Il segnaposto [DA CONFERMARE] diventa un'etichetta ben visibile
+const fmt = (s) => String(s ?? "").replace(/\[DA CONFERMARE([^\]]*)\]/g, '<mark class="dc">[DA CONFERMARE$1]</mark>');
+const asset = (p) => `${BASE}/assets/${p}?v=${VERSIONE}`;
+const assetFisso = (p) => `${BASE}/assets/${p}`;
+const assoluto = (p) => SITO + p;
+const pad = (n) => String(n).padStart(2, "0");
+
+function scrivi(rel, contenuto) {
+  const dest = path.join(USCITA, rel);
   fs.mkdirSync(path.dirname(dest), { recursive: true });
   fs.writeFileSync(dest, contenuto);
 }
 
-/* Sostituisce {nome}, {citta}... in tutti i testi di una lingua */
-function sostituisciSegnaposto(valore, tok) {
-  if (typeof valore === "string") return valore.replace(/\{(\w+)\}/g, (m, k) => (k in tok ? tok[k] : m));
-  if (Array.isArray(valore)) return valore.map((v) => sostituisciSegnaposto(v, tok));
-  if (valore && typeof valore === "object") {
-    const out = {};
-    for (const k of Object.keys(valore)) out[k] = sostituisciSegnaposto(valore[k], tok);
-    return out;
-  }
-  return valore;
-}
-
-/* Se in una lingua manca un testo, usa quello della lingua principale e avvisa */
-function completaConPrincipale(base, lingua, percorso = "") {
-  if (lingua === undefined) {
-    avvisi.push(`Testo mancante "${percorso}": uso quello della lingua principale.`);
-    return base;
-  }
-  if (Array.isArray(base) || typeof base !== "object" || base === null) return lingua;
-  const out = { ...lingua };
-  for (const k of Object.keys(base)) out[k] = completaConPrincipale(base[k], lingua[k], percorso ? `${percorso}.${k}` : k);
-  return out;
-}
-
-/* Legge larghezza e altezza delle foto (JPG, PNG, WebP, SVG) */
-const cacheDimensioni = {};
-function dimensioni(file) {
-  if (file in cacheDimensioni) return cacheDimensioni[file];
-  const p = path.join(RADICE, "assets", "img", file);
-  let d = null;
-  if (!fs.existsSync(p)) {
-    avvisi.push(`FOTO MANCANTE: assets/img/${file}`);
-  } else {
-    const b = fs.readFileSync(p);
-    try {
-      if (b.length > 24 && b.readUInt32BE(0) === 0x89504e47) {
-        d = { w: b.readUInt32BE(16), h: b.readUInt32BE(20) };
-      } else if (b[0] === 0xff && b[1] === 0xd8) {
-        let i = 2;
-        while (i < b.length - 9) {
-          if (b[i] !== 0xff) { i++; continue; }
-          const m = b[i + 1];
-          if (m === 0xff) { i++; continue; }
-          if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
-            d = { h: b.readUInt16BE(i + 5), w: b.readUInt16BE(i + 7) };
-            break;
-          }
-          i += 2 + b.readUInt16BE(i + 2);
-        }
-      } else if (b.toString("ascii", 0, 4) === "RIFF" && b.toString("ascii", 8, 12) === "WEBP") {
-        const t = b.toString("ascii", 12, 16);
-        if (t === "VP8 ") d = { w: b.readUInt16LE(26) & 0x3fff, h: b.readUInt16LE(28) & 0x3fff };
-        if (t === "VP8L") { const n = b.readUInt32LE(21); d = { w: (n & 0x3fff) + 1, h: ((n >> 14) & 0x3fff) + 1 }; }
-        if (t === "VP8X") d = { w: 1 + b.readUIntLE(24, 3), h: 1 + b.readUIntLE(27, 3) };
-      } else if (file.endsWith(".svg")) {
-        const s = b.toString("utf8");
-        const vb = s.match(/viewBox="[\d.\s-]*?([\d.]+)\s+([\d.]+)"/);
-        if (vb) d = { w: Math.round(+vb[1]), h: Math.round(+vb[2]) };
-      }
-    } catch (e) { /* foto illeggibile: si va avanti senza dimensioni */ }
-  }
-  cacheDimensioni[file] = d;
-  return d;
-}
-
-/* ---------------------------------------------------------------
-   STILE SCELTO (motore/stili.js) + ritocchi facoltativi di dati-cliente.js
-   --------------------------------------------------------------- */
-const nomeStile = STILI[C.stile] ? C.stile : "alpino-elegante";
-if (!STILI[C.stile]) avvisi.push(`Stile "${C.stile}" sconosciuto: uso "alpino-elegante". Stili disponibili: ${Object.keys(STILI).join(", ")}.`);
-const STILE = STILI[nomeStile];
-const pieno = (v) => typeof v === "string" && v.trim() !== "";
-const T0 = C.tema || {};
-const TEMA = {
-  colori: { ...STILE.colori, ...Object.fromEntries(Object.entries(T0.colori || {}).filter(([, v]) => pieno(v))) },
-  titoli: pieno(T0.caratteri?.titoli) ? T0.caratteri.titoli : STILE.caratteri.titoli,
-  testo: pieno(T0.caratteri?.testo) ? T0.caratteri.testo : STILE.caratteri.testo,
-  fileCaratteri: (T0.fileCaratteri && T0.fileCaratteri.length) ? T0.fileCaratteri : STILE.fileCaratteri,
-  raggio: pieno(T0.arrotondamento) ? T0.arrotondamento : STILE.arrotondamento,
-};
-const EFFETTI = { profondita3d: C.effetti?.profondita3d !== false, animazioni: C.effetti?.animazioni !== false };
-
-/* ---------------------------------------------------------------
-   FOTO: se il file esiste si usa, altrimenti si disegna un segnaposto
-   nei colori dello stile e nelle proporzioni del posto.
-   [larghezza, altezza, disegno]
-   --------------------------------------------------------------- */
-const POSTI = {
-  hero: [2000, 1250, "paesaggio"], heroTelefono: [900, 1400, "paesaggio"],
-  chiSiamo: [1200, 1500, "camino"], chiSiamo2: [800, 800, "vino"],
-  sfondoContatti: [2000, 1250, "sfondo"], offerta: [1200, 1500, "tavola"],
-  camera: [1200, 800, "interno"], prodotto: [800, 800, "prodotto"],
-  "g-grande": [1400, 1400, "paesaggio"], "g-alta": [800, 1600, "paesaggio"],
-  "g-larga": [1600, 800, "paesaggio"], "g-normale": [1000, 1000, "paesaggio"],
-};
-const esiste = (file) => !!file && fs.existsSync(path.join(RADICE, "assets", "img", file));
-function foto(file, posto, scena) {
-  if (!file) return null;
-  if (esiste(file)) {
-    const d = dimensioni(file);
-    return { src: `/assets/img/${file}`, w: d && d.w, h: d && d.h, vera: true };
-  }
-  const [w, h, sc] = POSTI[posto] || [1200, 900, "paesaggio"];
-  const rel = `assets/img/segnaposto/${slug(file.replace(/\.[a-z0-9]+$/i, ""))}-${w}x${h}.svg`;
-  if (!fs.existsSync(path.join(USCITA, rel))) {
-    scriviFile(rel, DISEGNI.segnaposto(STILE.scena, scena || sc, w, h, file));
-    segnapostoUsati.push(`${file}  →  ${w} × ${h} px`);
-  }
-  return { src: "/" + rel, w, h, vera: false, nome: file };
-}
-
-/* Etichetta dei segnaposto: piccola, in un angolo, uguale su ogni schermo (HTML, non dentro il disegno) */
-function etichettaFoto(file, posto, classe = "") {
-  if (!file || esiste(file) || C.etichetteSegnaposto === false) return "";
-  const [w, h] = POSTI[posto] || [1200, 900];
-  return `<span class="segnaposto${classe ? " " + classe : ""}" aria-hidden="true"><b>FOTO SEGNAPOSTO</b>${esc(file)} · ${w} × ${h} px</span>`;
-}
-
-/* Versione leggera facoltativa: se esiste assets/img/piccole/<stesso nome>, telefoni e schermi piccoli
-   scaricano quella (srcset) e la foto grande resta per gli schermi ampi e per l'ingrandimento della galleria. */
-const LARGHEZZE = {
-  "g-grande": "(max-width: 859px) 100vw, 690px", "g-larga": "(max-width: 859px) 100vw, 690px",
-  "g-alta": "(max-width: 859px) 50vw, 340px", "g-normale": "(max-width: 859px) 50vw, 340px",
-  offerta: "(max-width: 759px) 92vw, 620px", camera: "(max-width: 759px) 92vw, 620px", chiSiamo: "(max-width: 759px) 85vw, 480px",
-};
-function srcsetPiccola(file, f, posto) {
-  const piccola = `piccole/${file}`;
-  if (!f.vera || !f.w || !LARGHEZZE[posto] || !esiste(piccola)) return "";
-  const d = dimensioni(piccola);
-  if (!d || d.w >= f.w) return "";
-  return ` srcset="/assets/img/${esc(piccola)} ${d.w}w, ${esc(f.src)} ${f.w}w" sizes="${LARGHEZZE[posto]}"`;
-}
-
-function img(file, alt, { posto = "", scena = "", classe = "", subito = false, senzaEtichetta = false } = {}) {
-  const f = foto(file, posto, scena);
-  if (!f) return "";
-  return `<img src="${esc(f.src)}"${srcsetPiccola(file, f, posto)} alt="${esc(alt)}"`
-    + (f.w ? ` width="${f.w}" height="${f.h}"` : "")
-    + (subito ? ` fetchpriority="high"` : ` loading="lazy"`)
-    + ` decoding="async"`
-    + (classe ? ` class="${classe}"` : "") + `>`
-    + (f.vera || senzaEtichetta ? "" : etichettaFoto(file, posto));
-}
-
-/* ---------------------------------------------------------------
-   ICONE (disegni SVG semplici). Nomi utilizzabili nei punti di forza:
-   montagna, foglia, fuoco, cuore, stella, posizione, orologio, telefono,
-   email, whatsapp, persone, letto, attrezzi, premio, sole, neve, check, globo
-   --------------------------------------------------------------- */
-const ICONE = {
-  telefono: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
-  whatsapp: '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/><path d="M9.5 9.5c.3 1.6 1.4 3.1 3 4l1.2-1 1.8.8-.4 1.5c-2.9.2-6.2-3-6.1-6l1.5-.4.8 1.8z"/>',
-  email: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
-  posizione: '<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>',
-  orologio: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
-  montagna: '<path d="m8 3 4 8 5-5 5 15H2L8 3z"/>',
-  foglia: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>',
-  fuoco: '<path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z"/>',
-  cuore: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78L12 21.23l8.84-8.84a5.5 5.5 0 0 0 0-7.78z"/>',
-  stella: '<path d="m12 2 3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>',
-  freccia: '<path d="M5 12h14M12 5l7 7-7 7"/>',
-  chiudi: '<path d="M18 6 6 18M6 6l12 12"/>',
-  sinistra: '<path d="m15 18-6-6 6-6"/>',
-  destra: '<path d="m9 18 6-6-6-6"/>',
-  instagram: '<rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><path d="M17.5 6.5h.01"/>',
-  facebook: '<path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/>',
-  globo: '<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
-  persone: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
-  check: '<path d="M20 6 9 17l-5-5"/>',
-  letto: '<path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10M2 17h20M6 8v9"/>',
-  attrezzi: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
-  premio: '<circle cx="12" cy="8" r="7"/><path d="M8.21 13.89 7 23l5-3 5 3-1.21-9.12"/>',
-  sole: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
-  neve: '<path d="M12 2v20M2 12h20M4.93 4.93l14.14 14.14M19.07 4.93 4.93 19.07M9 3l3 3 3-3M9 21l3-3 3 3M3 9l3 3-3 3M21 9l-3 3 3 3"/>',
-};
-function icona(nome, classe = "icona") {
-  const p = ICONE[nome] || ICONE.check;
-  return `<svg class="${classe}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${p}</svg>`;
-}
-
-/* ---------------------------------------------------------------
-   CARICAMENTO DELLE LINGUE
-   --------------------------------------------------------------- */
-if (!Array.isArray(C.lingue) || C.lingue.length === 0) throw new Error("In dati-cliente.js manca l'elenco delle lingue.");
+/* ---------- testi ---------- */
 const PRINCIPALE = C.lingue[0];
-const A = C.attivita, I = C.indirizzo;
-const indirizzoCompleto = `${I.via}, ${I.cap} ${I.citta} (${I.provincia})`;
-const testi = {};
-let testoPrincipale = null;
+const T = {};
+for (const l of C.lingue) T[l.codice] = require(`./lingue/${l.codice}.js`);
 
-for (const lingua of C.lingue) {
-  const file = path.join(RADICE, "lingue", `${lingua.codice}.js`);
-  if (!fs.existsSync(file)) throw new Error(`Manca il file lingue/${lingua.codice}.js (lingua indicata in dati-cliente.js).`);
-  let t = require(file);
-  if (testoPrincipale) t = completaConPrincipale(testoPrincipale, t, lingua.codice);
-  const data = new Date(C.privacyAggiornata + "T12:00:00");
-  const tok = {
-    nome: A.nome, citta: I.citta, telefono: C.contatti.telefonoVisibile, email: C.contatti.email,
-    indirizzo: indirizzoCompleto, ragioneSociale: A.ragioneSociale, piva: A.partitaIva,
-    data: isNaN(data) ? C.privacyAggiornata : data.toLocaleDateString(lingua.codice, { day: "numeric", month: "long", year: "numeric" }),
-  };
-  testi[lingua.codice] = sostituisciSegnaposto(t, tok);
-  if (!testoPrincipale) testoPrincipale = t;
-}
-
-/* Controllo: i prezzi devono essere uguali in tutte le lingue */
-function controllaPrezzi() {
-  const tp = testi[PRINCIPALE.codice];
-  const elenchi = (t) => ({
-    menu: (t.menu?.categorie || []).flatMap((c) => c.piatti || []),
-    camere: t.camere?.elenco || [],
-    catalogo: t.catalogo?.prodotti || [],
-    listino: t.listino?.voci || [],
-  });
-  const base = elenchi(tp);
-  for (const l of C.lingue.slice(1)) {
-    const altro = elenchi(testi[l.codice]);
-    for (const k of Object.keys(base)) {
-      if (!C.sezioni[k]) continue;
-      if (base[k].length !== altro[k].length) avvisi.push(`Sezione "${k}": in ${l.codice}.js ci sono ${altro[k].length} voci, in ${PRINCIPALE.codice}.js ${base[k].length}.`);
-      base[k].forEach((v, i) => {
-        const a = altro[k][i];
-        if (a && v.prezzo && a.prezzo && v.prezzo.replace(/[^\d.,]/g, "") !== a.prezzo.replace(/[^\d.,]/g, ""))
-          avvisi.push(`Prezzo diverso in "${k}" voce ${i + 1}: ${PRINCIPALE.codice}="${v.prezzo}" / ${l.codice}="${a.prezzo}".`);
-      });
-    }
-    const n = (testi[l.codice].galleria?.descrizioni || []).length;
-    if (n !== C.galleria.length) avvisi.push(`Galleria: ${C.galleria.length} foto ma ${n} descrizioni in ${l.codice}.js.`);
-  }
-  if ((tp.galleria?.descrizioni || []).length !== C.galleria.length)
-    avvisi.push(`Galleria: ${C.galleria.length} foto ma ${(tp.galleria?.descrizioni || []).length} descrizioni in ${PRINCIPALE.codice}.js.`);
-}
-controllaPrezzi();
-
-/* ---------------------------------------------------------------
-   INDIRIZZI DELLE PAGINE
-   --------------------------------------------------------------- */
-const PAGINE_MENU = ["home", "chiSiamo", "servizi", "galleria", "contatti"];
-const PAGINE_INDICIZZATE = ["home", "chiSiamo", "servizi", "galleria", "contatti", "privacy"];
-
+// Indirizzo di una pagina in una lingua
 function url(lingua, chiave) {
-  const s = testi[lingua.codice].pagine[chiave].percorso;
-  let p = "/";
-  if (lingua.cartella) p += lingua.cartella + "/";
-  if (s) p += s + "/";
-  return p;
+  const p = T[lingua.codice].pagine[chiave];
+  if (!p) throw new Error(`Pagina "${chiave}" mancante in lingue/${lingua.codice}.js`);
+  return `${BASE}/${lingua.cartella ? lingua.cartella + "/" : ""}${p.percorso}`;
 }
 
-const telLink = () => `tel:${C.contatti.telefono.replace(/\s+/g, "")}`;
-const waLink = (msg) => `https://wa.me/${C.contatti.whatsapp}${msg ? `?text=${encodeURIComponent(msg)}` : ""}`;
-const mailLink = (oggetto, corpo) => {
-  const q = [];
-  if (oggetto) q.push("subject=" + encodeURIComponent(oggetto));
-  if (corpo) q.push("body=" + encodeURIComponent(corpo));
-  return `mailto:${C.contatti.email}${q.length ? "?" + q.join("&") : ""}`;
+const SERVIZI = ["ape", "diagnosi", "solare", "bonus", "condominio", "antincendio", "studi"];
+const PRIVATI = ["ape", "diagnosi", "solare", "bonus"];
+const PROFESSIONISTI = ["condominio", "antincendio", "studi"];
+const INDICIZZATE = ["home", "servizi", ...SERVIZI, "chiSiamo", "contatti", "privacy", "cookie", "crediti"];
+
+/* ---------- icone (poche, a linea) ---------- */
+const ICONE = {
+  telefono: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/>',
+  whatsapp: '<path d="M21 11.5a8.4 8.4 0 0 1-12.3 7.6L3 21l1.9-5.7A8.4 8.4 0 1 1 21 11.5z"/>',
+  modulo: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/>',
+  freccia: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  giu: '<path d="m6 9 6 6 6-6"/>',
+  posizione: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+  email: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/>',
+  esterno: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
 };
-const linkEsterno = (href, contenuto, t, classe = "") =>
-  `<a href="${esc(href)}"${classe ? ` class="${classe}"` : ""} target="_blank" rel="noopener">${contenuto}<span class="sr">${esc(t.ui.linkEsterno)}</span></a>`;
+const icona = (n, cl = "icona") => `<svg class="${cl}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONE[n]}</svg>`;
 
-/* ---------------------------------------------------------------
-   PEZZI RIUTILIZZATI
-   --------------------------------------------------------------- */
-const GIORNI = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"];
-const GIORNI_JS = { lun: 1, mar: 2, mer: 3, gio: 4, ven: 5, sab: 6, dom: 0 };
-const GIORNI_SCHEMA = { lun: "Monday", mar: "Tuesday", mer: "Wednesday", gio: "Thursday", ven: "Friday", sab: "Saturday", dom: "Sunday" };
+/* ---------- logotipo (vettoriale, nessun font da caricare) ---------- */
+const COLORI_SEGNO = ["#0B6B3A", "#6DB04B", "#F2C230", "#E2672E"];
+const segno = COLORI_SEGNO.map((c, i) => { const y = 3 + i * 7.5, h = 5.5, l = 11 + i * 5; return `<path fill="${c}" d="M0 ${y}h${l}l${h / 2} ${h / 2}-${h / 2} ${h / 2}H0z"/>`; }).join("");
+const logo = () => `<svg class="logo__svg" viewBox="0 0 ${40 + LOGO.larghezza} 36" aria-hidden="true" focusable="false">${segno}<g transform="translate(40 0)"><path class="logo__testo" d="${LOGO.studio}"/><path class="logo__testo" d="${LOGO.vela}"/><path class="logo__49" d="${LOGO.n49}"/></g></svg>`;
 
-function tabellaOrari(t) {
-  const righe = GIORNI.map((g) => {
-    const fasce = C.orari[g] || [];
-    const testo = fasce.length ? fasce.map((f) => esc(f.replace("-", "–"))).join("<br>") : esc(t.ui.chiuso);
-    return `<tr data-giorno="${GIORNI_JS[g]}"><th scope="row">${esc(t.ui.giorni[g])}</th><td>${testo}</td></tr>`;
-  }).join("");
-  return `<table class="orari"><caption class="sr">${esc(t.ui.orari)}</caption><tbody>${righe}</tbody></table>`;
+/* ---------- foto: <picture> AVIF → WebP → JPG ---------- */
+function foto(nome, alt, { sizes = "100vw", subito = false, classe = "", rivela = true } = {}) {
+  const f = FOTO[nome];
+  if (!f) { avvisi.push(`Foto sconosciuta: ${nome}`); return ""; }
+  const set = (ext) => f.larghezze.map((w) => `${assetFisso(`img/foto/${nome}-${w}.${ext}`)} ${w}w`).join(", ");
+  const media = f.larghezze[Math.min(1, f.larghezze.length - 1)];
+  return `<picture class="foto${classe ? " " + classe : ""}"${rivela && !subito ? " data-rivela=\"foto\"" : ""}>`
+    + `<source type="image/avif" srcset="${set("avif")}" sizes="${sizes}">`
+    + `<source type="image/webp" srcset="${set("webp")}" sizes="${sizes}">`
+    + `<img src="${assetFisso(`img/foto/${nome}-${media}.jpg`)}" srcset="${set("jpg")}" sizes="${sizes}" alt="${esc(alt)}" width="${f.w}" height="${f.h}"`
+    + (subito ? ` fetchpriority="high"` : ` loading="lazy"`) + ` decoding="async"></picture>`;
 }
 
-/* Pulsanti Chiama / WhatsApp / Email (+ link esterno) */
-function azioniContatto(t, { messaggio = "", oggetto = "", linkEst = "" } = {}) {
-  const P = C.prenotazione;
-  const out = [];
-  if (P.telefono) out.push(`<a class="pulsante" href="${esc(telLink())}">${icona("telefono")}${esc(t.ui.chiama)}</a>`);
-  if (P.whatsapp && C.contatti.whatsapp) out.push(linkEsterno(waLink(messaggio), `${icona("whatsapp")}${esc(t.ui.whatsapp)}`, t, "pulsante pulsante--wa"));
-  if (P.email) out.push(`<a class="pulsante pulsante--chiaro" href="${esc(mailLink(oggetto))}">${icona("email")}${esc(t.ui.email)}</a>`);
-  if (linkEst) out.push(linkEsterno(linkEst, `${esc(t.ui.prenota)}${icona("freccia")}`, t, "pulsante pulsante--chiaro"));
-  return `<div class="azioni">${out.join("")}</div>`;
+/* ---------- la scala energetica: il segno grafico del sito ---------- */
+const CLASSI = ["A4", "A3", "A2", "A1", "B", "C", "D", "E", "F", "G"];
+// Scala completa A4→G (illustrazione APE). evidenzia = classe con la freccia
+function scala({ evidenzia = "", etichetta = "", classe = "" } = {}) {
+  return `<div class="scala ${classe}" data-rivela="barre"${etichetta ? ` role="img" aria-label="${esc(etichetta)}"` : ' aria-hidden="true"'}>
+${CLASSI.map((k, i) => `<div class="scala__riga${k === evidenzia ? " scala__riga--qui" : ""}" style="--i:${i}"><span class="scala__barra c-${k}" style="--l:${34 + i * 7.3}%"><b>${k}</b></span>${k === evidenzia ? '<span class="scala__freccia"></span>' : ""}</div>`).join("")}
+</div>`;
 }
+// Divisore: dieci trattini che si riempiono in sequenza
+const divisore = (cl = "") => `<div class="divisore ${cl}" data-rivela="barre" aria-hidden="true">${CLASSI.map((k, i) => `<span class="c-${k}" style="--i:${i}"></span>`).join("")}</div>`;
 
-function social(t, classe = "social") {
-  const nomi = { instagram: "Instagram", facebook: "Facebook", tripadvisor: "Tripadvisor", google: "Google", booking: "Booking.com" };
-  const voci = Object.entries(C.social || {}).filter(([, v]) => v);
-  if (!voci.length) return "";
-  return `<ul class="${classe}">` + voci.map(([k, v]) =>
-    `<li><a href="${esc(v)}" target="_blank" rel="noopener" aria-label="${esc(nomi[k] || k)} ${esc(t.ui.linkEsterno)}">${icona(ICONE[k] ? k : "globo")}</a></li>`).join("") + `</ul>`;
-}
+/* Titolo con le parole che salgono da una maschera */
+const titolo = (tag, html, { id = "", classe = "" } = {}) => {
+  const parole = fmt(html).split(/(\s+|<br>)/).filter((p) => p.trim() !== "");
+  let i = 0;
+  const dentro = parole.map((p) => p === "<br>" ? "<br>" : p.startsWith("<mark") || p.includes("<") ? p : `<span class="w"><span style="--i:${i++}">${p}</span></span>`).join(" ");
+  return `<${tag}${id ? ` id="${id}"` : ""} class="titolo-entra${classe ? " " + classe : ""}" data-rivela="titolo">${dentro}</${tag}>`;
+};
+const eti = (s) => s ? `<p class="eti">${fmt(s)}</p>` : "";
+const pulsante = (href, s, cl = "") => `<a class="pulsante${cl ? " " + cl : ""}" href="${href}">${fmt(s)}${icona("freccia")}</a>`;
+const linkFreccia = (href, s) => `<a class="link-freccia" href="${href}">${fmt(s)}${icona("freccia")}</a>`;
 
-function intestazionePagina(etichetta, titolo, intro, extra = "") {
-  return `<header class="testa-pagina"><div class="contenitore stretto">`
-    + (etichetta ? `<p class="etichetta">${etichetta}</p>` : "")
-    + `<h1 class="titolo-pagina">${titoloAnimato(titolo)}</h1>` + (intro ? `<p class="intro intro--entra">${intro}</p>` : "")
-    + `</div>${extra ? `<div class="contenitore">${extra}</div>` : ""}<div class="testa-pagina__creste" aria-hidden="true" data-p="0.1">${profiloCreste("testa")}</div></header>`;
-}
+/* ---------- contatti ---------- */
+const K = C.contatti;
+const telLink = `tel:${K.telefono}`;
+const waLink = (t) => `https://wa.me/${K.whatsapp}?text=${encodeURIComponent(t.ui.whatsappMessaggio)}`;
+const I = C.indirizzo;
+const indirizzo = `${I.via}, ${I.cap} ${I.citta} (${I.provincia})`;
+const mappaRicerca = encodeURIComponent(`${I.via}, ${I.cap} ${I.citta}`);
 
-function datiStrutturati() {
-  const s = {
-    "@context": "https://schema.org",
-    "@type": A.tipoSchema || "LocalBusiness",
-    name: A.nome,
-    url: sitoUrl + "/",
-    image: [C.immagini.anteprimaSocial, C.immagini.hero].filter(esiste).map((f) => assoluto("/assets/img/" + f)),
-    telephone: C.contatti.telefono,
-    email: C.contatti.email,
-    address: { "@type": "PostalAddress", streetAddress: I.via, postalCode: I.cap, addressLocality: I.citta, addressRegion: I.provincia, addressCountry: I.nazione },
-    geo: { "@type": "GeoCoordinates", latitude: I.latitudine, longitude: I.longitudine },
-    openingHoursSpecification: GIORNI.flatMap((g) => (C.orari[g] || []).map((f) => {
-      const [apre, chiude] = f.split("-");
-      return { "@type": "OpeningHoursSpecification", dayOfWeek: `https://schema.org/${GIORNI_SCHEMA[g]}`, opens: apre.trim(), closes: chiude.trim() };
-    })),
-  };
-  if (A.fasciaPrezzo) s.priceRange = A.fasciaPrezzo;
-  if (A.cucina) s.servesCuisine = A.cucina.split(",").map((x) => x.trim());
-  if (A.partitaIva) s.vatID = A.partitaIva;
-  const same = Object.values(C.social || {}).filter(Boolean);
-  if (same.length) s.sameAs = same;
-  if (C.sezioni.menu && ["Restaurant", "CafeOrCoffeeShop", "BarOrPub", "FoodEstablishment"].includes(s["@type"])) {
-    s.hasMenu = assoluto(url(PRINCIPALE, "servizi") + "#menu");
-    s.acceptsReservations = true;
+/* ---------- modulo preventivo ---------- */
+function modulo(lingua, { servizio = "", id = "modulo", titoloForm = "" } = {}) {
+  const t = T[lingua.codice], f = t.form, M = C.modulo;
+  const chiave = (M.chiave || "").trim();
+  const servizioAttivo = chiave && !chiave.includes("DA CONFERMARE") ? M.servizio : "mailto";
+  const grazie = assoluto(url(lingua, "grazie"));
+  let azione = `mailto:${K.email}`, extra = "", attr = ` enctype="text/plain"`;
+  let trappola = "sito_web";
+  if (servizioAttivo === "web3forms") {
+    azione = "https://api.web3forms.com/submit"; attr = "";
+    extra = `<input type="hidden" name="access_key" value="${esc(chiave)}"><input type="hidden" name="redirect" value="${esc(grazie)}"><input type="hidden" name="subject" value="${esc(f.oggettoEmail)}">`;
+    trappola = "botcheck";
+  } else if (servizioAttivo === "formspree") {
+    azione = `https://formspree.io/f/${esc(chiave)}`; attr = ""; trappola = "_gotcha";
+    extra = `<input type="hidden" name="_subject" value="${esc(f.oggettoEmail)}">`;
+  } else if (servizioAttivo === "netlify") {
+    azione = url(lingua, "grazie"); attr = ` data-netlify="true" netlify-honeypot="${trappola}"`;
+    extra = `<input type="hidden" name="form-name" value="preventivo">`;
   }
-  return `<script type="application/ld+json">${JSON.stringify(s).replace(/</g, "\\u003c")}</script>`;
+  const p = `${id}-`;
+  const opz = (lista, scelto) => lista.map(([v, l]) => `<option value="${esc(v)}"${v === scelto ? " selected" : ""}>${esc(l)}</option>`).join("");
+  const linkPriv = `<a href="${url(lingua, "privacy")}">${esc(f.privacyLink)}</a>`;
+  return `<form class="modulo" id="${id}" name="preventivo" method="post" action="${azione}"${attr} data-modulo="${servizioAttivo}" data-grazie="${url(lingua, "grazie")}" data-email="${esc(K.email)}" data-oggetto="${esc(f.oggettoEmail)}" novalidate>
+${titoloForm ? `<h2 class="modulo__titolo">${fmt(titoloForm)}</h2>` : ""}
+${extra}<input type="hidden" name="lingua" value="${lingua.codice}">
+<div class="trappola" aria-hidden="true"><label for="${p}${trappola}">${esc(f.trappola)}</label><input id="${p}${trappola}" name="${trappola}" type="text" tabindex="-1" autocomplete="off"></div>
+<div class="modulo__griglia">
+<div class="campo"><label for="${p}nome">${esc(f.nome)} <span aria-hidden="true">*</span></label><input id="${p}nome" name="nome" type="text" autocomplete="name" required maxlength="120"></div>
+<div class="campo"><label for="${p}email">${esc(f.email)} <span aria-hidden="true">*</span></label><input id="${p}email" name="email" type="email" autocomplete="email" required maxlength="160"></div>
+<div class="campo"><label for="${p}tel">${esc(f.telefono)}</label><input id="${p}tel" name="telefono" type="tel" autocomplete="tel" inputmode="tel" maxlength="40"></div>
+<div class="campo"><label for="${p}servizio">${esc(f.servizio)} <span aria-hidden="true">*</span></label><div class="seleziona"><select id="${p}servizio" name="servizio" required><option value="">${esc(f.scegli)}</option>${opz(f.servizi, servizio)}</select>${icona("giu")}</div></div>
+<div class="campo"><label for="${p}immobile">${esc(f.immobile)}</label><div class="seleziona"><select id="${p}immobile" name="immobile"><option value="">${esc(f.scegli)}</option>${opz(f.immobili, "")}</select>${icona("giu")}</div></div>
+<div class="campo"><label for="${p}comune">${esc(f.comune)}</label><input id="${p}comune" name="comune" type="text" autocomplete="address-level2" maxlength="80"></div>
+<div class="campo campo--pieno"><label for="${p}msg">${esc(f.messaggio)}</label><textarea id="${p}msg" name="messaggio" rows="4" maxlength="4000" placeholder="${esc(f.messaggioAiuto)}"></textarea></div>
+<div class="campo campo--pieno campo--check"><input id="${p}privacy" name="privacy" type="checkbox" value="si" required><label for="${p}privacy">${f.privacy.replace("{link}", linkPriv)} <span aria-hidden="true">*</span></label></div>
+</div>
+<p class="modulo__errore" role="alert" hidden>${esc(f.errore)}</p>
+<div class="modulo__invio"><button class="pulsante" type="submit">${esc(f.invia)}${icona("freccia")}</button><p class="nota">${esc(f.obbligatori)}${servizioAttivo === "mailto" ? ` ${esc(f.notaMail)}` : ""}</p></div>
+</form>`;
 }
 
-/* ---------------------------------------------------------------
-   STRUTTURA COMUNE DI OGNI PAGINA (testa, menu, piede)
-   --------------------------------------------------------------- */
-/* Profilo di montagne decorativo (testate delle pagine e footer) */
-function profiloCreste(seme) {
-  const r = DISEGNI.casuale("profilo-" + seme);
-  const w = 1600, h = 160;
-  const a = DISEGNI.percorso(DISEGNI.cresta(r, w, h * 0.75, h * 0.6, 5), w, h);
-  const b = DISEGNI.percorso(DISEGNI.cresta(r, w, h * 0.95, h * 0.45, 7), w, h);
-  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" focusable="false"><path d="${a}" class="cresta-lontana"/><path d="${b}" class="cresta-vicina"/></svg>`;
+/* ---------- FAQ ---------- */
+const faq = (voci) => `<div class="faq">${voci.map((v) => `<details class="faq__voce"><summary><span>${fmt(v.d)}</span><span class="faq__segno" aria-hidden="true"></span></summary><div class="faq__risposta"><p>${fmt(v.r)}</p></div></details>`).join("")}</div>`;
+
+/* ---------- dati strutturati ---------- */
+function schemaStudio(lingua) {
+  const t = T[lingua.codice];
+  return {
+    "@type": "ProfessionalService", "@id": SITO + BASE + "/#studio", name: C.studio.nome, legalName: C.studio.ragioneSociale,
+    description: senzaDC(t.pagine.home.descrizione), url: assoluto(url(lingua, "home")), image: assoluto(assetFisso("img/og-image.jpg")),
+    logo: assoluto(assetFisso("img/logo.svg")), telephone: K.telefono, email: K.email, vatID: "IT" + C.studio.partitaIva, foundingDate: C.studio.fondazione,
+    address: { "@type": "PostalAddress", streetAddress: I.via, postalCode: I.cap, addressLocality: I.citta, addressRegion: I.provincia, addressCountry: "IT" },
+    areaServed: { "@type": "City", name: "Torino" },
+    founder: { "@id": SITO + BASE + "/#lombardo" },
+    knowsLanguage: C.lingue.map((l) => l.codice),
+  };
+}
+function schemaPersona(lingua) {
+  const t = T[lingua.codice];
+  return { "@type": "Person", "@id": SITO + BASE + "/#lombardo", name: "Natale Lombardo", honorificPrefix: "Ing.", jobTitle: t.chiSiamo.ruolo,
+    alumniOf: { "@type": "CollegeOrUniversity", name: "Politecnico di Torino" }, worksFor: { "@id": SITO + BASE + "/#studio" },
+    image: assoluto(assetFisso("img/foto/ing-natale-lombardo-280.jpg")) };
+}
+const schemaFaq = (voci) => ({ "@type": "FAQPage", mainEntity: voci.map((v) => ({ "@type": "Question", name: senzaDC(v.d), acceptedAnswer: { "@type": "Answer", text: senzaDC(v.r) } })) });
+function schemaBriciole(lingua, chiave) {
+  const t = T[lingua.codice];
+  const voci = [["home", t.ui.home]];
+  if (SERVIZI.includes(chiave)) voci.push(["servizi", t.pagine.servizi.menu]);
+  voci.push([chiave, t.pagine[chiave].menu]);
+  return { "@type": "BreadcrumbList", itemListElement: voci.map(([k, n], i) => ({ "@type": "ListItem", position: i + 1, name: senzaDC(n), item: assoluto(url(lingua, k)) })) };
 }
 
-function css_tema() {
-  const c = TEMA.colori;
-  const font = TEMA.fileCaratteri.map((f) =>
-    `@font-face{font-family:'${f.nome}';src:url('/assets/font/${f.file}') format('woff2');font-weight:${f.peso || "400"};font-style:normal;font-display:swap}`).join("");
-  return font + `:root{color-scheme:${STILE.schema};--primario:${c.primario};--su-primario:${c.suPrimario || "#ffffff"};--primario-scuro:${c.primarioScuro};--su-scuro:${c.suScuro || "#f5f2ec"};--accento:${c.accento};--accento-su-scuro:${c.accentoSuScuro || c.accento};--sfondo:${c.sfondo};--sfondo-alt:${c.sfondoAlt};--superficie:${c.superficie || c.sfondo};--testo:${c.testo};--testo-soft:${c.testoSoft};--bordo:${c.bordo};--font-titoli:${TEMA.titoli};--font-testo:${TEMA.testo};--raggio:${TEMA.raggio};--peso-titoli:${STILE.pesoTitoli || 600}}`;
+/* ---------- briciole visibili ---------- */
+function briciole(lingua, chiave) {
+  const t = T[lingua.codice];
+  const voci = [[url(lingua, "home"), t.ui.home]];
+  if (SERVIZI.includes(chiave)) voci.push([url(lingua, "servizi"), t.pagine.servizi.menu]);
+  return `<nav class="briciole" aria-label="${esc(t.ui.briciole)}"><ol>${voci.map(([h, n]) => `<li><a href="${h}">${esc(n)}</a></li>`).join("")}<li aria-current="page">${esc(t.pagine[chiave].menu)}</li></ol></nav>`;
 }
 
-function pagina(lingua, chiave, corpo, { noindex = false, schema = false, file = null } = {}) {
-  const t = testi[lingua.codice];
-  const p = t.pagine[chiave];
-  const nome = A.nome;
-  const titolo = chiave === "home" ? togliHtml(p.titolo) : `${togliHtml(p.titolo)} | ${nome}`;
-  const indicizzata = PAGINE_INDICIZZATE.includes(chiave) && !noindex;
-  const qui = chiave === "errore" ? null : url(lingua, chiave);
-  const og = C.immagini.anteprimaSocial;
-  const dOg = dimensioni(og);
-
-  const alternate = indicizzata
-    ? C.lingue.map((l) => `<link rel="alternate" hreflang="${l.codice}" href="${assoluto(url(l, chiave))}">`).join("\n")
-      + `\n<link rel="alternate" hreflang="x-default" href="${assoluto(url(PRINCIPALE, chiave))}">`
-    : "";
-
-  const precarica = TEMA.fileCaratteri.map((f) =>
-    `<link rel="preload" href="/assets/font/${f.file}" as="font" type="font/woff2" crossorigin>`).join("\n");
-
-  const head = `<!doctype html>
-<html lang="${lingua.codice}" data-stile="${nomeStile}" data-3d="${EFFETTI.profondita3d ? "si" : "no"}" data-animazioni="${EFFETTI.animazioni ? "si" : "no"}">
-<head>
-<meta charset="utf-8">
-<script>(function(d){d.classList.add("js");setTimeout(function(){if(!d.hasAttribute("data-pronto"))d.classList.add("mostra-tutto")},3000)})(document.documentElement)</script>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(titolo)}</title>
-<meta name="description" content="${esc(togliHtml(p.descrizione))}">
-${(C.demo || !indicizzata) ? '<meta name="robots" content="noindex, follow">' : ""}
-${qui ? `<link rel="canonical" href="${assoluto(qui)}">` : ""}
-${alternate}
-<meta name="theme-color" content="${esc(TEMA.colori.sfondo)}">
-<meta property="og:type" content="website">
-<meta property="og:site_name" content="${esc(nome)}">
-<meta property="og:title" content="${esc(titolo)}">
-<meta property="og:description" content="${esc(togliHtml(p.descrizione))}">
-${qui ? `<meta property="og:url" content="${assoluto(qui)}">` : ""}
-<meta property="og:image" content="${assoluto("/assets/img/" + og)}">
-${dOg ? `<meta property="og:image:width" content="${dOg.w}">\n<meta property="og:image:height" content="${dOg.h}">` : ""}
-<meta property="og:image:alt" content="${esc(nome)}">
-<meta property="og:locale" content="${lingua.locale}">
-${C.lingue.filter((l) => l !== lingua).map((l) => `<meta property="og:locale:alternate" content="${l.locale}">`).join("\n")}
-<meta name="twitter:card" content="summary_large_image">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
-${precarica}
-<link rel="stylesheet" href="/assets/css/stile.css?v=${VERSIONE}">
-<style>${css_tema()}</style>
-<script src="/assets/js/sito.js?v=${VERSIONE}" defer></script>
-${schema ? datiStrutturati() : ""}
-</head>`.replace(/\n{2,}/g, "\n");
-
-  // Menu di navigazione
-  const voci = PAGINE_MENU.map((k) => {
-    const attuale = k === chiave ? ` aria-current="page"` : "";
-    return `<li><a href="${url(lingua, k)}"${attuale}>${esc(t.pagine[k].menu)}</a></li>`;
-  }).join("");
-  const selettore = C.lingue.length > 1
-    ? `<ul class="lingue" aria-label="${esc(t.ui.lingua)}">` + C.lingue.map((l) => {
-        const dest = chiave === "errore" ? url(l, "home") : url(l, chiave);
-        const attuale = l === lingua ? ` aria-current="true"` : "";
-        return `<li><a href="${dest}" hreflang="${l.codice}" lang="${l.codice}"${attuale}><abbr title="${esc(l.nome)}">${l.codice.toUpperCase()}</abbr></a></li>`;
-      }).join("") + `</ul>`
-    : "";
-  if (C.immagini.logo && !esiste(C.immagini.logo)) avvisi.push(`Logo non trovato: assets/img/${C.immagini.logo} (mostro il nome scritto).`);
-  const logo = esiste(C.immagini.logo) ? img(C.immagini.logo, nome, { subito: true, classe: "logo__img" }) : esc(nome);
-
-  const testata = `<a class="salta" href="#contenuto">${esc(t.ui.saltaAlContenuto)}</a>
-<header class="testata${chiave === "home" ? " testata--sopra" : ""}" data-testata>
-${C.demo ? `<div class="demo">${esc(t.ui.demo)}</div>` : ""}
-<div class="contenitore testata__riga">
-<a class="logo" href="${url(lingua, "home")}">${logo}</a>
-<button class="menu-pulsante" type="button" aria-expanded="false" aria-controls="menu-principale" data-apri="${esc(t.ui.menuApri)}" data-chiudi="${esc(t.ui.menuChiudi)}"><span class="sr">${esc(t.ui.menuApri)}</span><span class="hamburger" aria-hidden="true"></span></button>
-<nav id="menu-principale" class="nav" aria-label="Menu">
-<ul class="nav__lista">${voci}</ul>
-${selettore}
-<a class="pulsante pulsante--piccolo nav__cta" href="${url(lingua, "contatti")}">${esc(t.ui.contattaci)}</a>
+/* ---------- intestazione, piede, barra mobile ---------- */
+function intestazione(lingua, chiave) {
+  const t = T[lingua.codice];
+  const attuale = (k) => k === chiave ? ' aria-current="page"' : "";
+  const lingue = C.lingue.map((l) => `<a href="${url(l, chiave)}" hreflang="${l.codice}" lang="${l.codice}"${l === lingua ? ' aria-current="true"' : ""}><span class="sr">${esc(l.nome)}</span><span aria-hidden="true">${l.codice.toUpperCase()}</span></a>`).join("");
+  const voceServizio = (k) => `<li><a href="${url(lingua, k)}"${attuale(k)}>${esc(t.pagine[k].menu)}</a></li>`;
+  return `<a class="salta" href="#contenuto">${esc(t.ui.salta)}</a>
+<div class="avanzamento" aria-hidden="true"><span></span></div>
+<header class="testata${chiave === "home" ? " testata--sopra" : ""}">
+<div class="testata__dentro">
+<a class="logo" href="${url(lingua, "home")}" aria-label="StudioVela49 — ${esc(t.ui.home)}">${logo()}</a>
+<nav class="nav" id="nav" aria-label="${esc(t.ui.menu)}">
+<ul class="nav__lista">
+<li class="nav__gruppo"><button type="button" class="nav__apri" aria-expanded="false" aria-controls="nav-servizi">${esc(t.pagine.servizi.menu)}${icona("giu")}</button>
+<div class="nav__pannello" id="nav-servizi">
+<div><p class="eti">${esc(t.ui.privati)}</p><ul>${PRIVATI.map(voceServizio).join("")}</ul></div>
+<div><p class="eti">${esc(t.ui.professionisti)}</p><ul>${PROFESSIONISTI.map(voceServizio).join("")}</ul></div>
+<p class="nav__tutti"><a href="${url(lingua, "servizi")}"${attuale("servizi")}>${esc(t.ui.tuttiServizi)}</a></p>
+</div></li>
+<li><a href="${url(lingua, "bonus")}"${attuale("bonus")}>${esc(t.pagine.bonus.menuBreve || t.pagine.bonus.menu)}</a></li>
+<li><a href="${url(lingua, "condominio")}"${attuale("condominio")}>${esc(t.pagine.condominio.menuBreve || t.pagine.condominio.menu)}</a></li>
+<li><a href="${url(lingua, "chiSiamo")}"${attuale("chiSiamo")}>${esc(t.pagine.chiSiamo.menu)}</a></li>
+<li><a href="${url(lingua, "contatti")}"${attuale("contatti")}>${esc(t.pagine.contatti.menu)}</a></li>
+</ul>
+<div class="nav__lingue" role="group" aria-label="${esc(t.ui.lingua)}">${lingue}</div>
+<p class="nav__telefono"><a href="${telLink}">${icona("telefono")}${esc(K.telefonoVisibile)}</a></p>
 </nav>
+<a class="pulsante pulsante--piccolo testata__cta" href="${url(lingua, "contatti")}#modulo">${esc(t.ui.richiediPreventivo)}</a>
+<button type="button" class="menu-pulsante" aria-expanded="false" aria-controls="nav" data-apri="${esc(t.ui.apriMenu)}" data-chiudi="${esc(t.ui.chiudiMenu)}"><span class="sr">${esc(t.ui.apriMenu)}</span><span class="menu-pulsante__linee" aria-hidden="true"></span></button>
 </div>
 </header>`;
+}
 
-  const anno = new Date().getFullYear();
-  const firma = C.firma && C.firma.testo
-    ? (C.firma.link ? linkEsterno(C.firma.link, esc(C.firma.testo), t) : esc(C.firma.testo)) : "";
-  const piede = `<footer class="piede">
-<div class="piede__cresta" aria-hidden="true">${profiloCreste("piede")}</div>
+function barraMobile(lingua, ancora) {
+  const t = T[lingua.codice];
+  return `<nav class="barra" aria-label="${esc(t.ui.contattoRapido)}">
+<a href="${telLink}">${icona("telefono")}<span>${esc(t.ui.chiama)}</span></a>
+${C.whatsappAttivo ? `<a href="${waLink(t)}" rel="noopener" target="_blank">${icona("whatsapp")}<span>${esc(t.ui.whatsapp)}<span class="sr"> (${esc(t.ui.nuovaFinestra)})</span></span></a>` : ""}
+<a class="barra__principale" href="${ancora}">${icona("modulo")}<span>${esc(t.ui.preventivo)}</span></a>
+</nav>`;
+}
+
+function piede(lingua) {
+  const t = T[lingua.codice];
+  const voce = (k) => `<li><a href="${url(lingua, k)}">${esc(t.pagine[k].menu)}</a></li>`;
+  return `<footer class="piede">
 <div class="contenitore">
-<div class="piede__cta" data-rivela="su">
-<p class="piede__frase">${chiave === "home" ? t.chiSiamo.finaleTitolo : t.home.contattiTitolo}</p>
-<a class="pulsante pulsante--grande pulsante--su-scuro" href="${url(lingua, "contatti")}">${esc(t.ui.contattaci)}${icona("freccia")}</a>
-</div>
+${divisore("divisore--piede")}
 <div class="piede__griglia">
-<div class="piede__marchio">
-<p class="piede__nome">${esc(nome)}</p>
-<p class="piede__motto">${t.home.heroSottotitolo}</p>
-${social(t)}
+<div class="piede__studio">
+<a class="logo logo--chiaro" href="${url(lingua, "home")}" aria-label="StudioVela49 — ${esc(t.ui.home)}">${logo()}</a>
+<p>${esc(t.ui.piedeFrase)}</p>
+<p class="piede__contatti"><a href="${telLink}">${esc(K.telefonoVisibile)}</a><br><a href="mailto:${K.email}">${K.email}</a></p>
+<address>${esc(I.via)}<br>${esc(I.cap)} ${esc(I.citta)} (${esc(I.provincia)})</address>
 </div>
-<div>
-<p class="piede__titolo">${esc(t.pagine.contatti.menu)}</p>
-<ul class="piede__lista">
-<li><a href="${esc(telLink())}">${icona("telefono")}${esc(C.contatti.telefonoVisibile)}</a></li>
-${C.contatti.whatsapp ? `<li>${linkEsterno(waLink(""), `${icona("whatsapp")}${esc(t.ui.whatsapp)}`, t)}</li>` : ""}
-<li><a href="mailto:${esc(C.contatti.email)}">${icona("email")}${esc(C.contatti.email)}</a></li>
-<li class="piede__indirizzo">${icona("posizione")}<span>${esc(I.via)}<br>${esc(I.cap)} ${esc(I.citta)} (${esc(I.provincia)})</span></li>
-</ul>
-</div>
-<div>
-<p class="piede__titolo">${esc(t.ui.orari)}</p>
-${tabellaOrari(t)}
-</div>
-<div>
-<p class="piede__titolo">${esc(t.ui.scopriDiPiu)}</p>
-<ul class="piede__lista">${PAGINE_MENU.map((k) => `<li><a href="${url(lingua, k)}">${esc(t.pagine[k].menu)}</a></li>`).join("")}</ul>
-</div>
+<div><h2 class="eti">${esc(t.ui.privati)}</h2><ul>${PRIVATI.map(voce).join("")}</ul></div>
+<div><h2 class="eti">${esc(t.ui.professionisti)}</h2><ul>${PROFESSIONISTI.map(voce).join("")}</ul></div>
+<div><h2 class="eti">${esc(t.ui.studio)}</h2><ul>${["chiSiamo", "contatti", "servizi"].map(voce).join("")}</ul></div>
 </div>
 <div class="piede__fondo">
-<p>© ${anno} ${esc(A.ragioneSociale)}${A.partitaIva ? ` · ${esc(t.ui.partitaIva)} ${esc(A.partitaIva)}` : ""}${A.cin ? ` · ${esc(t.ui.cin)} ${esc(A.cin)}` : ""}</p>
-<p><a href="${url(lingua, "privacy")}">${esc(t.pagine.privacy.menu)}</a> · <button type="button" class="link-pulsante" data-cookie-preferenze>${esc(t.ui.preferenzeCookie)}</button></p>
-${firma ? `<p class="piede__firma">${firma}</p>` : ""}
+<p>© ${new Date().getFullYear()} ${esc(C.studio.ragioneSociale)} · ${esc(t.ui.piva)} ${C.studio.partitaIva}</p>
+<ul class="piede__legali">${["privacy", "cookie", "crediti"].map(voce).join("")}</ul>
+<p>${esc(C.firma)}</p>
 </div>
 </div>
-</footer>
-<div class="cookie" id="cookie-banner" role="region" aria-label="Cookie" hidden>
-<p class="cookie__testo">${esc(t.cookie.testo)} <a href="${url(lingua, "privacy")}">${esc(t.cookie.info)}</a></p>
-<div class="cookie__azioni">
-<button type="button" class="pulsante pulsante--chiaro" data-cookie="rifiuta">${esc(t.cookie.rifiuta)}</button>
-<button type="button" class="pulsante pulsante--chiaro" data-cookie="accetta">${esc(t.cookie.accetta)}</button>
-</div>
-<button type="button" class="cookie__x" data-cookie="rifiuta" aria-label="${esc(t.ui.chiudi)}">${icona("chiudi")}</button>
-</div>
-${C.sezioni.whatsappFisso && C.contatti.whatsapp ? `<a class="wa-fisso" href="${esc(waLink(""))}" target="_blank" rel="noopener" aria-label="${esc(t.ui.whatsappFisso)} ${esc(t.ui.linkEsterno)}">${icona("whatsapp")}</a>` : ""}`;
+</footer>`;
+}
 
-  const html = `${head}
-<body class="pagina-${chiave}">
-${testata}
-<main id="contenuto">
+/* ---------- la pagina intera ---------- */
+function pagina(lingua, chiave, corpo, { schemi = [], file = "", noindex = false, ancora = "" } = {}) {
+  const t = T[lingua.codice], m = t.pagine[chiave];
+  const titoloPag = senzaDC(m.titolo), descr = senzaDC(m.descrizione);
+  const robots = ANTEPRIMA || noindex ? "noindex, nofollow" : "index, follow";
+  const indicizzata = INDICIZZATE.includes(chiave);
+  const alternate = indicizzata ? C.lingue.map((l) => `<link rel="alternate" hreflang="${l.codice}" href="${assoluto(url(l, chiave))}">`).join("\n")
+    + `\n<link rel="alternate" hreflang="x-default" href="${assoluto(url(PRINCIPALE, chiave))}">` : "";
+  const grafo = { "@context": "https://schema.org", "@graph": [schemaStudio(lingua), ...(chiave !== "home" && indicizzata ? [schemaBriciole(lingua, chiave)] : []), ...schemi] };
+  const html = `<!doctype html>
+<html lang="${lingua.codice}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(titoloPag)}</title>
+<meta name="description" content="${esc(descr)}">
+<meta name="robots" content="${robots}">
+${indicizzata ? `<link rel="canonical" href="${assoluto(url(lingua, chiave))}">\n${alternate}` : ""}
+<meta name="theme-color" content="#0E2233">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="StudioVela49">
+<meta property="og:locale" content="${lingua.locale}">
+<meta property="og:title" content="${esc(titoloPag)}">
+<meta property="og:description" content="${esc(descr)}">
+<meta property="og:url" content="${assoluto(url(lingua, chiave))}">
+<meta property="og:image" content="${assoluto(assetFisso("img/og-image.jpg"))}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="${assetFisso("img/favicon.svg")}" type="image/svg+xml">
+<link rel="apple-touch-icon" href="${assetFisso("img/apple-touch-icon.png")}">
+<link rel="preload" href="${assetFisso("font/instrument-sans.woff2")}" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="${assetFisso("font/inter.woff2")}" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="${asset("css/stile.css")}">
+<script>document.documentElement.classList.add("js")</script>
+<script type="application/ld+json">${JSON.stringify(grafo).replace(/</g, "\\u003c")}</script>
+</head>
+<body class="p-${chiave}">
+${intestazione(lingua, chiave)}
+<main id="contenuto" tabindex="-1">
 ${corpo}
 </main>
-${piede}
+${piede(lingua)}
+${barraMobile(lingua, ancora || `${url(lingua, "contatti")}#modulo`)}
+<script src="${asset("js/sito.js")}" defer></script>
 </body>
 </html>
 `;
-  scriviFile(file || path.join(qui, "index.html"), html);
+  scrivi(file || path.join(url(lingua, chiave).slice(BASE.length + 1), "index.html"), html);
 }
 
-/* ---------------------------------------------------------------
-   SEZIONI DI SETTORE
-   --------------------------------------------------------------- */
-const SEZIONI = {
-  menu(t) {
-    const m = t.menu;
-    const categorie = m.categorie.map((c, i) => `<div class="menu-categoria" data-rivela="su" style="--ritardo:${(i % 2) * 120}ms">
-<h3>${c.nome}</h3>
-<ul class="menu-lista">${c.piatti.map((p) => `<li class="piatto">
-<p class="piatto__riga"><span class="piatto__nome">${p.nome}${p.veg ? ' <span class="piatto__tag">V</span>' : ""}</span><span class="piatto__linea" aria-hidden="true"></span><span class="piatto__prezzo">${esc(p.prezzo)}</span></p>
-${p.descrizione ? `<p class="piatto__desc">${p.descrizione}</p>` : ""}
-</li>`).join("")}</ul>
-</div>`).join("");
-    return `<div class="intestazione intestazione--centro" data-rivela="su"><p class="etichetta">${String(1).padStart(2, "0")}</p><h2>${m.titolo}</h2><p>${m.intro}</p></div>
-<div class="menu-carta">
-<div class="menu-griglia">${categorie}</div>
-<p class="nota">${[m.legenda, m.nota].filter(Boolean).join(" · ")}</p>
-</div>
-<div class="riquadro-azione" data-rivela="prospettiva">
-<div><h3>${m.prenotaTitolo}</h3><p>${m.prenotaTesto}</p></div>
-${azioniContatto(t, { messaggio: m.messaggioWhatsapp, oggetto: m.oggettoEmail, linkEst: C.prenotazione.linkEsterno })}
+/* ---------- blocchi condivisi ---------- */
+// I due appartamenti: APE uguale, diagnosi diversa (home e pagina Diagnosi)
+function confronto(lingua, { grande = false } = {}) {
+  const c = T[lingua.codice].confronto;
+  const casa = (k, consumo) => `<figure class="casa" style="--consumo:${consumo}">
+<svg class="casa__disegno" viewBox="0 0 160 120" aria-hidden="true" focusable="false"><path class="casa__muro" d="M14 112V44L80 8l66 36v68z"/><rect class="casa__finestra" x="34" y="54" width="28" height="24"/><rect class="casa__finestra" x="98" y="54" width="28" height="24"/><rect class="casa__porta" x="68" y="78" width="24" height="34"/>${k === "a" ? '<circle class="casa__persona" cx="44" cy="96" r="5"/><circle class="casa__persona" cx="116" cy="96" r="5"/><path class="casa__calore" d="M40 40c4-6-4-8 0-14M120 40c4-6-4-8 0-14"/>' : '<circle class="casa__persona casa__persona--via" cx="116" cy="96" r="5"/>'}</svg>
+<figcaption><strong>${fmt(c[k].nome)}</strong><span>${fmt(c[k].chi)}</span></figcaption>
+<dl class="casa__dati">
+<div><dt>${fmt(c.ape)}</dt><dd><span class="classe c-D">D</span><span class="sr">${esc(c.stessaClasse)}</span></dd></div>
+<div><dt>${fmt(c.reale)}</dt><dd><span class="consumo" data-rivela="barre"><span style="--i:2"></span></span><span class="consumo__testo">${fmt(c[k].consumo)}</span></dd></div>
+</dl>
+</figure>`;
+  return `<div class="confronto${grande ? " confronto--grande" : ""}">
+<p class="confronto__esempio eti">${fmt(c.esempio)}</p>
+<div class="confronto__case">${casa("a", 0.92)}<span class="confronto__vs" aria-hidden="true">≠</span>${casa("b", 0.34)}</div>
+<p class="confronto__nota">${fmt(c.nota)}</p>
 </div>`;
-  },
+}
 
-  camere(t) {
-    const c = t.camere;
-    const schede = c.elenco.map((r, i) => {
-      const link = C.disponibilitaCamere.linkEsterno
-        ? linkEsterno(C.disponibilitaCamere.linkEsterno, `${esc(c.pulsante)}${icona("freccia")}`, t, "pulsante")
-        : `<a class="pulsante" href="${esc(mailLink(c.oggettoEmail.replace("{camera}", togliHtml(r.nome)), c.corpoEmail.replace("{camera}", togliHtml(r.nome))))}">${esc(c.pulsante)}${icona("freccia")}</a>`;
-      return `<article class="camera${i % 2 ? " camera--inversa" : ""}">
-<div class="camera__media" data-rivela="prospettiva"><div class="cornice cornice--3d" data-tilt>${img(r.foto, togliHtml(r.nome), { posto: "camera", scena: ["interno", "camino", "terrazza"][i % 3], classe: "cornice__img" })}</div></div>
-<div class="camera__testo" data-rivela="su" style="--ritardo:120ms">
-<p class="etichetta">${icona("persone")}${r.ospiti}</p>
-<h3 class="titolo-medio">${r.nome}</h3>
-<p>${r.descrizione}</p>
-<ul class="chip-lista">${(r.dotazioni || []).map((d) => `<li>${icona("check")}${d}</li>`).join("")}</ul>
-<div class="camera__piede"><p class="prezzo">${esc(r.prezzo)}</p>${link}</div>
+// Chiamata finale con modulo, uguale per struttura ma sempre ultima della pagina
+function finale(lingua, { servizio = "", titoloSez, frase, fotoNome = "torino-mole", alt = "" }) {
+  const t = T[lingua.codice];
+  return `<section class="finale" aria-labelledby="t-finale">
+<div class="finale__foto">${foto(fotoNome, alt || t.alt[fotoNome], { sizes: "(min-width: 960px) 40vw, 100vw" })}</div>
+<div class="finale__testo">
+${titolo("h2", titoloSez, { id: "t-finale", classe: "h2" })}
+<p class="intro">${fmt(frase)}</p>
+<ul class="finale__rapidi"><li><a href="${telLink}">${icona("telefono")}${esc(K.telefonoVisibile)}</a></li><li><a href="mailto:${K.email}">${icona("email")}${K.email}</a></li></ul>
 </div>
-</article>`;
-    }).join("");
-    return `<div class="intestazione intestazione--centro" data-rivela="su"><h2>${c.titolo}</h2><p>${c.intro}</p></div>
-<div class="camere">${schede}</div>
-${c.nota ? `<p class="nota nota--centro">${c.nota}</p>` : ""}`;
-  },
+<div class="finale__modulo">${modulo(lingua, { servizio })}</div>
+</section>`;
+}
 
-  catalogo(t) {
-    const c = t.catalogo;
-    const categorie = [...new Set(c.prodotti.map((p) => p.categoria).filter(Boolean))];
-    const filtri = categorie.length > 1
-      ? `<div class="filtri" role="group" aria-label="${esc(c.titolo)}">
-<button type="button" class="filtro" data-filtro="*" aria-pressed="true">${esc(c.tutti)}</button>
-${categorie.map((k) => `<button type="button" class="filtro" data-filtro="${slug(k)}" aria-pressed="false">${esc(k)}</button>`).join("")}
-</div>` : "";
-    const schede = c.prodotti.map((p, i) => `<article class="scheda prodotto" data-categoria="${slug(p.categoria || "")}" data-rivela="prospettiva" style="--ritardo:${(i % 3) * 90}ms">
-<div class="scheda__tilt" data-tilt>
-<div class="cornice">${img(p.foto, togliHtml(p.nome), { posto: "prodotto", scena: i % 2 ? "vino" : "prodotto", classe: "cornice__img" })}</div>
-<div class="scheda__corpo">
-${p.categoria ? `<p class="scheda__categoria">${esc(p.categoria)}</p>` : ""}
-<h3>${p.nome}</h3>
-${p.descrizione ? `<p>${p.descrizione}</p>` : ""}
-<div class="scheda__piede"><p class="prezzo">${esc(p.prezzo)}</p>
-${C.contatti.whatsapp
-  ? linkEsterno(waLink(c.messaggioWhatsapp.replace("{prodotto}", togliHtml(p.nome))), `${icona("whatsapp")}${esc(c.pulsante)}`, t, "pulsante pulsante--piccolo pulsante--chiaro")
-  : `<a class="pulsante pulsante--piccolo pulsante--chiaro" href="${esc(mailLink(togliHtml(p.nome)))}">${icona("email")}${esc(c.pulsante)}</a>`}
-</div>
-</div>
-</div>
-</article>`).join("");
-    return `<div class="intestazione intestazione--centro" data-rivela="su"><h2>${c.titolo}</h2><p>${c.intro}</p></div>
-${filtri}
-<div class="griglia-prodotti" data-catalogo>${schede}</div>
-${c.nota ? `<p class="nota nota--centro">${c.nota}</p>` : ""}`;
-  },
-
-  listino(t) {
-    const l = t.listino;
-    return `<div class="intestazione intestazione--centro" data-rivela="su"><h2>${l.titolo}</h2><p>${l.intro}</p></div>
-<ul class="listino">${l.voci.map((v, i) => `<li class="listino__voce" data-rivela="su" style="--ritardo:${i * 80}ms">
-<span class="listino__numero" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
-<div><h3>${v.nome}</h3>${v.descrizione ? `<p>${v.descrizione}</p>` : ""}</div>
-<div class="listino__lato">${v.durata ? `<p class="listino__durata">${icona("orologio")}${esc(v.durata)}</p>` : ""}<p class="prezzo">${esc(v.prezzo)}</p></div>
-</li>`).join("")}</ul>
-${l.nota ? `<p class="nota nota--centro">${l.nota}</p>` : ""}
-<div class="riquadro-azione" data-rivela="prospettiva"><div><h3>${t.home.contattiTitolo}</h3><p>${t.home.contattiTesto}</p></div>${azioniContatto(t, { messaggio: "", oggetto: togliHtml(l.titolo) })}</div>`;
-  },
-
-  faq(t) {
-    const f = t.faq;
-    return `<div class="faq-griglia">
-<div class="intestazione" data-rivela="su"><h2>${f.titolo}</h2></div>
-<div class="faq" data-rivela="su" style="--ritardo:120ms">${f.domande.map((d) => `<details><summary>${d.domanda}</summary><div class="faq__risposta"><p>${d.risposta}</p></div></details>`).join("")}</div>
-</div>`;
-  },
-};
-const sezioniAttive = () => (C.ordineSezioni || Object.keys(SEZIONI)).filter((k) => C.sezioni[k] && SEZIONI[k]);
-
-/* Titolo diviso in parole, per l'animazione d'entrata */
-const titoloAnimato = (testo) => togliHtml(testo).split(/\s+/).filter(Boolean)
-  .map((p, i) => `<span class="parola"><span style="--i:${i}">${esc(p)}</span></span>`).join(" ");
-
-/* ---------------------------------------------------------------
-   LE PAGINE
-   --------------------------------------------------------------- */
+/* =====================================================================
+   PAGINE
+   ===================================================================== */
 function paginaHome(lingua) {
-  const t = testi[lingua.codice], h = t.home;
-  const attive = sezioniAttive();
-
-  // Grande immagine: foto vera (con eventuale versione per telefono) oppure montagne disegnate a strati
-  let sfondoHero;
-  if (esiste(C.immagini.hero)) {
-    const fotoHero = img(C.immagini.hero, "", { subito: true, classe: "hero__img" });
-    sfondoHero = `<div class="strato strato--foto" data-p="0.35" data-m="10">`
-      + (esiste(C.immagini.heroTelefono) ? `<picture><source media="(max-width: 700px)" srcset="/assets/img/${esc(C.immagini.heroTelefono)}">${fotoHero}</picture>` : fotoHero)
-      + `</div>`;
-  } else {
-    const nota = `${C.immagini.hero || "hero.jpg"}  →  2000 × 1250 px (facoltativa: ora ci sono le montagne disegnate a strati)`;
-    if (!segnapostoUsati.includes(nota)) segnapostoUsati.unshift(nota);
-    sfondoHero = DISEGNI.stratiPaesaggio(STILE.scena, 1600, 1000, "hero-" + A.nome, "h")
-      .map((s, i) => `<svg class="strato strato--${i}" data-p="${s.p}" data-m="${s.m}" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMax slice" aria-hidden="true" focusable="false">${s.html}</svg>`).join("");
-  }
-  const video = C.immagini.heroVideo && fs.existsSync(path.join(RADICE, "assets", "video", C.immagini.heroVideo))
-    ? ` data-video="/assets/video/${esc(C.immagini.heroVideo)}"` : "";
-  if (C.immagini.heroVideo && !video) avvisi.push(`Video non trovato: assets/video/${C.immagini.heroVideo}`);
-  const primaSezione = attive[0] ? `${url(lingua, "servizi")}#${attive[0]}` : url(lingua, "servizi");
-
-  const punti = h.puntiForza.map((p, i) => `<li class="punto" data-rivela="prospettiva" style="--ritardo:${i * 110}ms">
-<span class="punto__numero" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
-<div class="punto__corpo">${icona(p.icona, "icona punto__icona")}<h3>${p.titolo}</h3><p>${p.testo}</p></div>
-</li>`).join("");
-
-  const sceneOfferta = ["tavola", "interno", "vino"];
-  const offerta = h.anteprima.map((a, i) => {
-    const href = url(lingua, "servizi") + (a.ancora && attive.includes(a.ancora) ? `#${a.ancora}` : "");
-    return `<article class="offerta__riga${i % 2 ? " offerta__riga--inversa" : ""}">
-<div class="offerta__media" data-rivela="prospettiva">
-<a class="cornice cornice--3d" href="${href}" tabindex="-1" aria-hidden="true" data-tilt>${img(a.foto, "", { posto: "offerta", scena: sceneOfferta[i % 3], classe: "cornice__img" })}</a>
-<span class="offerta__numero" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
+  const t = T[lingua.codice], h = t.home;
+  const colonna = (k, scuro) => {
+    const g = h.pubblici[k];
+    return `<div class="pubblico${scuro ? " pubblico--scuro" : ""}" data-rivela="su">
+${eti(g.eti)}
+<h3 class="h2">${fmt(g.titolo)}</h3>
+<p class="intro">${fmt(g.frase)}</p>
+<ul class="pubblico__voci">${g.voci.map((v) => `<li><a href="${url(lingua, v)}"><span>${esc(t.pagine[v].menu)}</span>${icona("freccia")}</a></li>`).join("")}</ul>
+${pulsante(url(lingua, g.cta[0]) + (g.cta[0] === "contatti" ? "#modulo" : ""), g.cta[1], scuro ? "" : "pulsante--inchiostro")}
+</div>`;
+  };
+  const schede = h.griglia.schede.map((s, i) => `<li class="scheda scheda--${s.forma}" data-rivela="su" style="--ritardo:${(i % 3) * 90}ms">
+<a href="${url(lingua, s.k)}">
+${s.foto ? foto(s.foto, t.alt[s.foto], { sizes: "(min-width: 960px) 50vw, 100vw", rivela: false }) : ""}
+<span class="scheda__testo"><span class="scheda__pubblico">${esc(s.k && PRIVATI.includes(s.k) ? t.ui.privati : t.ui.professionisti)}</span><span class="scheda__titolo">${esc(t.pagine[s.k].menu)}</span><span class="scheda__frase">${fmt(s.frase)}</span><span class="scheda__vai" aria-hidden="true">${icona("freccia")}</span></span>
+</a></li>`).join("");
+  const corpo = `<section class="apertura" aria-labelledby="t-apertura">
+<div class="apertura__foto">${foto("torino-tetti", t.alt["torino-tetti"], { subito: true, sizes: "100vw" })}</div>
+<div class="apertura__testo contenitore">
+${eti(h.apertura.eti)}
+${titolo("h1", h.apertura.titolo, { id: "t-apertura", classe: "h1" })}
+<p class="intro">${fmt(h.apertura.frase)}</p>
+${pulsante(`${url(lingua, "contatti")}#modulo`, h.apertura.cta)}
 </div>
-<div class="offerta__testo" data-rivela="su" style="--ritardo:150ms">
-<p class="etichetta">${String(i + 1).padStart(2, "0")} / ${String(h.anteprima.length).padStart(2, "0")}</p>
-<h3 class="titolo-grande">${a.titolo}</h3>
-<p class="intro">${a.testo}</p>
-<a class="link-freccia" href="${href}">${esc(t.ui.scopriDiPiu)}<span class="sr">: ${esc(togliHtml(a.titolo))}</span>${icona("freccia")}</a>
-</div>
-</article>`;
-  }).join("");
+<div class="apertura__scala" aria-hidden="true">${CLASSI.map((k, i) => `<span class="c-${k}" style="--i:${i}"></span>`).join("")}</div>
+</section>
 
-  const recensioni = C.sezioni.recensioni && h.recensioni?.length ? `<section class="sezione sezione--alt recensioni-sezione" aria-labelledby="t-recensioni">
+<section class="pubblici" aria-label="${esc(t.ui.perChi)}">
+${colonna("privati", false)}
+${colonna("professionisti", true)}
+</section>
+
+<section class="sezione contenitore" aria-labelledby="t-servizi">
+<div class="testa testa--lato">
+<div>${eti(h.griglia.eti)}${titolo("h2", h.griglia.titolo, { id: "t-servizi", classe: "h2" })}</div>
+<p class="intro">${fmt(h.griglia.frase)}</p>
+</div>
+<ul class="bento">${schede}</ul>
+</section>
+
+<section class="sezione sezione--carta2 passi-sezione" aria-labelledby="t-passi">
 <div class="contenitore">
-<div class="recensioni-testa" data-rivela="su">
-<h2 id="t-recensioni">${h.recensioniTitolo}</h2>
-<div class="carosello__controlli">
-<button type="button" class="tondo" data-car="prec" aria-label="${esc(t.ui.recPrecedente)}">${icona("sinistra")}</button>
-<button type="button" class="tondo" data-car="pausa" aria-pressed="false" aria-label="${esc(t.ui.pausa)}" data-pausa="${esc(t.ui.pausa)}" data-riproduci="${esc(t.ui.riproduci)}"><span class="icona-pausa" aria-hidden="true"></span></button>
-<button type="button" class="tondo" data-car="succ" aria-label="${esc(t.ui.recSuccessiva)}">${icona("destra")}</button>
-</div>
-</div>
-<div class="carosello" data-carosello>
-<ul class="carosello__binario" tabindex="0" aria-label="${esc(t.ui.recensioni)}">${h.recensioni.map((r, i) => `<li class="recensione" data-tilt="lieve" aria-label="${i + 1} / ${h.recensioni.length}">
-<span class="recensione__virgolette" aria-hidden="true">“</span>
-<blockquote><p>${r.testo}</p></blockquote>
-<div class="recensione__piede">
-<p class="stelle" role="img" aria-label="${esc(t.ui.stelle.replace("{n}", r.stelle))}">${Array.from({ length: 5 }, (_, k) => icona("stella", k < r.stelle ? "stella piena" : "stella")).join("")}</p>
-<p class="recensione__autore"><strong>${r.autore}</strong>${r.provenienza ? ` · ${r.provenienza}` : ""}${r.fonte ? `<br><span>${r.fonte}</span>` : ""}</p>
-</div>
-</li>`).join("")}</ul>
-<div class="carosello__punti" aria-hidden="true">${h.recensioni.map((_, i) => `<span${i === 0 ? ' class="attivo"' : ""}></span>`).join("")}</div>
-</div>
-</div>
-</section>` : "";
-
-  const sfondoContatti = C.immagini.sfondoContatti
-    ? `<div class="contatti-hero__sfondo" data-p="0.15">${img(C.immagini.sfondoContatti, "", { posto: "sfondoContatti", classe: "contatti-hero__img", senzaEtichetta: true })}</div>${etichettaFoto(C.immagini.sfondoContatti, "sfondoContatti", "segnaposto--angolo")}` : "";
-
-  const corpo = `<section class="hero"${video} data-hero>
-<div class="hero__strati">${sfondoHero}</div>
-<div class="hero__velo"></div>
-<div class="contenitore hero__testo" data-p="-0.12">
-<p class="etichetta etichetta--hero"><span class="hero__linea" aria-hidden="true"></span>${h.heroEtichetta}</p>
-<h1 class="hero__titolo">${titoloAnimato(h.heroTitolo)}</h1>
-<p class="hero__sottotitolo">${h.heroSottotitolo}</p>
-<div class="azioni hero__azioni">
-<a class="pulsante pulsante--grande pulsante--hero" href="${url(lingua, "contatti")}">${h.pulsantePrincipale}${icona("freccia")}</a>
-<a class="pulsante pulsante--grande pulsante--trasparente" href="${primaSezione}">${h.pulsanteSecondario}</a>
-</div>
-</div>
-<a class="hero__scorri" href="#scopri"><span class="hero__scorri-testo">${esc(t.ui.scorri)}</span><span class="hero__scorri-linea" aria-hidden="true"></span></a>
-${video ? `<button type="button" class="hero__video-pulsante tondo" hidden aria-pressed="false" aria-label="${esc(t.ui.pausa)}" data-pausa="${esc(t.ui.pausa)}" data-riproduci="${esc(t.ui.riproduci)}"><span class="icona-pausa" aria-hidden="true"></span></button>` : ""}
-</section>
-<section class="sezione punti-sezione" id="scopri" aria-labelledby="t-punti">
-<div class="contenitore punti-griglia">
-<div class="punti-testa" data-rivela="su">
-<p class="etichetta">${esc(A.nome)}</p>
-<h2 id="t-punti" class="titolo-grande">${h.puntiForzaTitolo}</h2>
-${h.puntiForzaIntro ? `<p class="intro">${h.puntiForzaIntro}</p>` : ""}
-</div>
-<ol class="punti">${punti}</ol>
+${eti(h.passi.eti)}
+${titolo("h2", h.passi.titolo, { id: "t-passi", classe: "h2" })}
+<ol class="passi">${h.passi.voci.map((v, i) => `<li class="passo" data-rivela="su" style="--ritardo:${i * 120}ms">
+<span class="passo__numero" aria-hidden="true">${pad(i + 1)}</span>
+<span class="passo__barra c-${["E", "B", "A4"][i]}" data-rivela="barre"><span style="--i:${i}"></span></span>
+<h3 class="h3">${fmt(v.titolo)}</h3>
+<p>${fmt(v.testo)}</p>
+</li>`).join("")}</ol>
 </div>
 </section>
-<section class="sezione offerta" aria-labelledby="t-offerta">
+
+<section class="sezione contenitore confronto-sezione" aria-labelledby="t-confronto">
+<div class="testa testa--centro">
+${eti(h.confronto.eti)}
+${titolo("h2", h.confronto.titolo, { id: "t-confronto", classe: "h2" })}
+<p class="intro">${fmt(h.confronto.frase)}</p>
+</div>
+${confronto(lingua)}
+<p class="centro">${linkFreccia(url(lingua, "diagnosi"), h.confronto.link)}</p>
+</section>
+
+<section class="diviso" aria-labelledby="t-perche">
+<div class="diviso__foto">${foto("progetto-tavolo", t.alt["progetto-tavolo"], { sizes: "(min-width: 960px) 50vw, 100vw" })}</div>
+<div class="diviso__testo">
+${eti(h.perche.eti)}
+${titolo("h2", h.perche.titolo, { id: "t-perche", classe: "h2" })}
+<ol class="motivi">${h.perche.voci.map((v, i) => `<li data-rivela="su"><span class="motivi__n" aria-hidden="true">${pad(i + 1)}</span><div><h3 class="h3">${fmt(v.titolo)}</h3><p>${fmt(v.testo)}</p></div></li>`).join("")}</ol>
+</div>
+</section>
+
+<section class="valori" aria-labelledby="t-valori">
 <div class="contenitore">
-<div class="intestazione intestazione--centro" data-rivela="su"><h2 id="t-offerta" class="titolo-grande">${h.anteprimaTitolo}</h2><p class="intro">${h.anteprimaIntro}</p></div>
-${offerta}
+<h2 id="t-valori" class="eti eti--chiara">${fmt(h.valori.eti)}</h2>
+<ul class="valori__parole">${h.valori.parole.map((p, i) => `<li data-rivela="su" style="--ritardo:${i * 100}ms"><span class="valori__n" aria-hidden="true">${pad(i + 1)}</span>${fmt(p)}</li>`).join("")}</ul>
+<p class="valori__frase">${fmt(h.valori.frase)}</p>
 </div>
 </section>
-${recensioni}
-<section class="contatti-hero" aria-labelledby="t-contatti">
-${sfondoContatti}
-<div class="contatti-hero__velo"></div>
-<div class="contenitore contatti-hero__griglia">
-<div class="contatti-hero__testo" data-rivela="su">
-<h2 id="t-contatti" class="titolo-grande">${h.contattiTitolo}</h2>
-<p class="intro">${h.contattiTesto}</p>
-${azioniContatto(t, { messaggio: t.menu?.messaggioWhatsapp || "" })}
-</div>
-<div class="vetro" data-rivela="prospettiva" style="--ritardo:150ms">
-<p class="info-riga">${icona("posizione")}<span><strong>${esc(t.ui.indirizzo)}</strong><br>${esc(indirizzoCompleto)}</span></p>
-<div class="info-riga">${icona("orologio")}<div><strong>${esc(t.ui.orari)}</strong>${tabellaOrari(t)}</div></div>
-</div>
-</div>
-</section>`;
-  pagina(lingua, "home", corpo, { schema: true });
-}
 
-function paginaChiSiamo(lingua) {
-  const t = testi[lingua.codice], c = t.chiSiamo;
-  const primo = c.numeri && c.numeri[0];
-  const corpo = `<section class="sezione chi-testa">
-<div class="contenitore due-colonne">
-<div class="chi-testa__testo">
-<p class="etichetta">${c.etichetta}</p>
-<h1 class="titolo-pagina">${titoloAnimato(c.titolo)}</h1>
-<p class="intro" data-rivela="su">${c.intro}</p>
-</div>
-<div class="collage" data-rivela="prospettiva">
-<div class="cornice cornice--3d collage__principale" data-tilt>${img(C.immagini.chiSiamo, togliHtml(c.titolo), { posto: "chiSiamo", subito: true, classe: "cornice__img" })}</div>
-${C.immagini.chiSiamo2 ? `<div class="cornice collage__secondaria" data-p="-0.08">${img(C.immagini.chiSiamo2, "", { posto: "chiSiamo2", classe: "cornice__img" })}</div>` : ""}
-${primo ? `<p class="collage__bollo" aria-hidden="true"><span>${primo.valore}</span>${primo.etichetta}</p>` : ""}
-</div>
+<section class="sezione persona contenitore stretto" aria-labelledby="t-persona">
+<div class="persona__ritratto" data-rivela="su">${foto("ing-natale-lombardo", t.alt["ing-natale-lombardo"], { sizes: "160px", rivela: false })}</div>
+${eti(h.persona.eti)}
+${titolo("h2", h.persona.titolo, { id: "t-persona", classe: "h2" })}
+<p class="intro">${fmt(h.persona.testo)}</p>
+${linkFreccia(url(lingua, "chiSiamo"), h.persona.link)}
+</section>
+
+<section class="sezione sezione--carta2" aria-labelledby="t-faq">
+<div class="contenitore faq-griglia">
+<div class="faq-griglia__testa">${eti(h.faq.eti)}${titolo("h2", h.faq.titolo, { id: "t-faq", classe: "h2" })}</div>
+${faq(h.faq.voci)}
 </div>
 </section>
-<section class="sezione sezione--alt">
-<div class="contenitore stretto testo-lungo racconto">
-${c.paragrafi.map((p, i) => `<p data-rivela="su" style="--ritardo:${i * 80}ms">${p}</p>`).join("\n")}
-</div>
-<figure class="contenitore citazione" data-rivela="prospettiva"><blockquote><p>“${c.citazione.testo}”</p></blockquote><figcaption>— ${c.citazione.autore}</figcaption></figure>
-</section>
-<section class="sezione">
-<div class="contenitore">
-<ul class="numeri">${c.numeri.map((n, i) => `<li data-rivela="prospettiva" style="--ritardo:${i * 100}ms"><span class="numeri__valore">${n.valore}</span><span class="numeri__etichetta">${n.etichetta}</span></li>`).join("")}</ul>
-<div class="riquadro-azione" data-rivela="prospettiva">
-<div><h2>${c.finaleTitolo}</h2><p>${c.finaleTesto}</p></div>
-<div class="azioni"><a class="pulsante" href="${url(lingua, "contatti")}">${esc(t.ui.contattaci)}${icona("freccia")}</a></div>
-</div>
-</div>
-</section>`;
-  pagina(lingua, "chiSiamo", corpo);
+
+${finale(lingua, { titoloSez: h.finale.titolo, frase: h.finale.frase })}`;
+  pagina(lingua, "home", corpo, { schemi: [schemaPersona(lingua), schemaFaq(h.faq.voci)], ancora: "#modulo" });
 }
 
 function paginaServizi(lingua) {
-  const t = testi[lingua.codice], s = t.servizi;
-  const attive = sezioniAttive();
-  const indice = attive.length > 1
-    ? `<nav class="indice" aria-label="${esc(togliHtml(s.titolo))}"><ul>${attive.map((k, i) => `<li><a href="#${k}"><span aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>${t[k].titolo}</a></li>`).join("")}</ul></nav>` : "";
-  const sezioni = attive.map((k, i) =>
-    `<section id="${k}" class="sezione sezione--ancora sezione--${k}${i % 2 === 1 ? " sezione--alt" : ""}"><div class="contenitore">${SEZIONI[k](t)}</div></section>`).join("\n");
-  const corpo = intestazionePagina(s.etichetta, s.titolo, s.intro, indice) + sezioni;
+  const t = T[lingua.codice], s = t.servizi;
+  const classePer = { ape: "A4", diagnosi: "A2", solare: "B", bonus: "C", condominio: "D", antincendio: "F", studi: "G" };
+  const riga = (k, i) => `<li class="indice__riga" data-rivela="su"><a href="${url(lingua, k)}">
+<span class="indice__n">${pad(i + 1)}</span>
+<span class="indice__nome">${esc(t.pagine[k].menu)}</span>
+<span class="indice__frase">${fmt(t[k].riassunto)}</span>
+<span class="indice__classe c-${classePer[k]}" aria-hidden="true"></span>
+${icona("freccia")}</a></li>`;
+  const corpo = `<section class="testa-pagina contenitore">
+${briciole(lingua, "servizi")}
+${titolo("h1", s.titolo, { classe: "h1" })}
+<p class="intro">${fmt(s.frase)}</p>
+</section>
+<section class="sezione sezione--stretta contenitore" aria-labelledby="t-privati">
+<h2 id="t-privati" class="indice__gruppo">${esc(t.ui.privati)}<span>${fmt(s.privati)}</span></h2>
+<ol class="indice">${PRIVATI.map(riga).join("")}</ol>
+<h2 class="indice__gruppo">${esc(t.ui.professionisti)}<span>${fmt(s.professionisti)}</span></h2>
+<ol class="indice" start="5">${PROFESSIONISTI.map((k, i) => riga(k, i + 4)).join("")}</ol>
+</section>
+<section class="sezione sezione--carta2" aria-labelledby="t-altri">
+<div class="contenitore altri">
+<h2 id="t-altri" class="h3">${fmt(s.altriTitolo)}</h2>
+<ul class="etichette">${s.altri.map((a) => `<li>${fmt(a)}</li>`).join("")}</ul>
+<p class="nota">${fmt(s.altriNota)}</p>
+</div>
+</section>
+${finale(lingua, { titoloSez: s.finaleTitolo, frase: s.finaleFrase, fotoNome: "torino-panorama" })}`;
   pagina(lingua, "servizi", corpo);
 }
 
-/* Griglia della galleria: grande, verticale, orizzontale, normale (si ripete ogni 9 foto) */
-const SCHEMA_GALLERIA = ["g-grande", "g-alta", "g-normale", "g-normale", "g-normale", "g-larga", "g-alta", "g-larga", "g-normale"];
-// 9 disegni diversi, scelti perché due caselle vicine non siano mai dello stesso tipo
-const SCENE_GALLERIA = ["paesaggio", "piste", "vino", "camino", "tavola", "terrazza", "interno", "paesaggio", "prodotto"];
+const schemaServizio = (lingua, k) => ({ "@type": "Service", name: senzaDC(T[lingua.codice].pagine[k].menu), description: senzaDC(T[lingua.codice].pagine[k].descrizione),
+  provider: { "@id": SITO + BASE + "/#studio" }, areaServed: { "@type": "City", name: "Torino" }, url: assoluto(url(lingua, k)) });
 
-function paginaGalleria(lingua) {
-  const t = testi[lingua.codice], g = t.galleria;
-  const voci = C.galleria.map((f, i) => {
-    const alt = (g.descrizioni && g.descrizioni[i]) || "";
-    const posto = SCHEMA_GALLERIA[i % 9];
-    const ff = foto(f, posto, SCENE_GALLERIA[i % 9]);
-    return `<li class="galleria__cella ${posto}" data-rivela="scala" style="--ritardo:${(i % 3) * 80}ms"><a class="galleria__voce" data-tilt="lieve" href="${esc(ff.src)}" data-indice="${i}" data-didascalia="${esc(alt)}" aria-label="${esc(t.ui.ingrandisci)}: ${esc(alt)}">${img(f, alt, { posto, scena: SCENE_GALLERIA[i % 9], subito: i === 0 })}<span class="galleria__didascalia" aria-hidden="true">${esc(alt)}</span></a></li>`;
-  }).join("");
-  const corpo = intestazionePagina(g.etichetta, g.titolo, g.intro) + `<section class="sezione sezione--compatta">
-<div class="contenitore contenitore--largo">
-<ul class="galleria">${voci}</ul>
+// Elenco numerato semplice (riusato con layout diversi via classe)
+const elenco = (voci, cl) => `<ol class="${cl}">${voci.map((v, i) => `<li data-rivela="su" style="--ritardo:${i * 80}ms"><span class="${cl}__n" aria-hidden="true">${pad(i + 1)}</span><div><h3 class="h3">${fmt(v.titolo)}</h3>${v.testo ? `<p>${fmt(v.testo)}</p>` : ""}</div></li>`).join("")}</ol>`;
+
+function paginaApe(lingua) {
+  const t = T[lingua.codice], p = t.ape;
+  const corpo = `<section class="ap-ape contenitore">
+<div class="ap-ape__testo">
+${briciole(lingua, "ape")}
+${titolo("h1", p.titolo, { classe: "h1" })}
+<p class="intro">${fmt(p.frase)}</p>
+${pulsante("#modulo", p.cta)}
+</div>
+${scala({ evidenzia: "", etichetta: p.scalaAlt, classe: "scala--grande" })}
+</section>
+<section class="sezione sezione--carta2" aria-labelledby="t-quando">
+<div class="contenitore">
+${eti(p.quando.eti)}${titolo("h2", p.quando.titolo, { id: "t-quando", classe: "h2" })}
+<ul class="quattro">${p.quando.voci.map((v, i) => `<li data-rivela="su" style="--ritardo:${i * 90}ms"><span class="quattro__segno c-${["A2", "C", "E", "G"][i]}" aria-hidden="true"></span><h3 class="h3">${fmt(v.titolo)}</h3><p>${fmt(v.testo)}</p></li>`).join("")}</ul>
 </div>
 </section>
-<dialog class="lightbox" aria-label="${esc(g.titolo)}">
-<figure class="lightbox__figura"><img class="lightbox__img" src="data:," alt=""><figcaption class="lightbox__didascalia"></figcaption></figure>
-<p class="lightbox__contatore" aria-live="polite"></p>
-<button type="button" class="lightbox__btn lightbox__chiudi" aria-label="${esc(t.ui.chiudi)}">${icona("chiudi")}</button>
-<button type="button" class="lightbox__btn lightbox__prec" aria-label="${esc(t.ui.precedente)}">${icona("sinistra")}</button>
-<button type="button" class="lightbox__btn lightbox__succ" aria-label="${esc(t.ui.successiva)}">${icona("destra")}</button>
-</dialog>`;
-  pagina(lingua, "galleria", corpo);
+<section class="dichiarazione" aria-labelledby="t-sopralluogo">
+<div class="contenitore">
+${eti(p.sopralluogo.eti)}
+${titolo("h2", p.sopralluogo.titolo, { id: "t-sopralluogo", classe: "dichiarazione__testo" })}
+<p class="intro">${fmt(p.sopralluogo.frase)}</p>
+</div>
+</section>
+<section class="sezione contenitore due" aria-labelledby="t-preparare">
+<div>${eti(p.preparare.eti)}${titolo("h2", p.preparare.titolo, { id: "t-preparare", classe: "h2" })}<p>${fmt(p.preparare.frase)}</p></div>
+<ul class="spunte">${p.preparare.voci.map((v) => `<li data-rivela="su">${fmt(v)}</li>`).join("")}</ul>
+</section>
+<section class="sezione sezione--carta2" aria-labelledby="t-faq">
+<div class="contenitore faq-griglia"><div class="faq-griglia__testa">${titolo("h2", t.ui.faq, { id: "t-faq", classe: "h2" })}</div>${faq(p.faq)}</div>
+</section>
+${finale(lingua, { servizio: "ape", titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "torino-tetti" })}`;
+  pagina(lingua, "ape", corpo, { schemi: [schemaServizio(lingua, "ape"), schemaFaq(p.faq)], ancora: "#modulo" });
+}
+
+function paginaDiagnosi(lingua) {
+  const t = T[lingua.codice], p = t.diagnosi;
+  const corpo = `<section class="ap-diagnosi contenitore">
+${briciole(lingua, "diagnosi")}
+<div class="ap-diagnosi__testa">
+${titolo("h1", p.titolo, { classe: "h1" })}
+<p class="intro">${fmt(p.frase)}</p>
+</div>
+${confronto(lingua, { grande: true })}
+<p class="centro">${pulsante("#modulo", p.cta)}</p>
+</section>
+<section class="diviso diviso--inverso" aria-labelledby="t-ottieni">
+<div class="diviso__foto">${foto("termocamera", t.alt.termocamera, { sizes: "(min-width: 960px) 50vw, 100vw" })}</div>
+<div class="diviso__testo">
+${eti(p.ottieni.eti)}${titolo("h2", p.ottieni.titolo, { id: "t-ottieni", classe: "h2" })}
+${elenco(p.ottieni.voci, "motivi")}
+</div>
+</section>
+<section class="citazione contenitore stretto">
+<blockquote data-rivela="su"><p>${fmt(p.citazione)}</p></blockquote>
+${divisore()}
+</section>
+<section class="sezione sezione--carta2" aria-labelledby="t-faq">
+<div class="contenitore faq-griglia"><div class="faq-griglia__testa">${titolo("h2", t.ui.faq, { id: "t-faq", classe: "h2" })}</div>${faq(p.faq)}</div>
+</section>
+${finale(lingua, { servizio: "diagnosi", titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "valvola" })}`;
+  pagina(lingua, "diagnosi", corpo, { schemi: [schemaServizio(lingua, "diagnosi"), schemaFaq(p.faq)], ancora: "#modulo" });
+}
+
+function paginaSolare(lingua) {
+  const t = T[lingua.codice], p = t.solare;
+  const corpo = `<section class="ap-solare">
+<div class="ap-solare__testo contenitore">
+${briciole(lingua, "solare")}
+<p class="ap-solare__numero" aria-hidden="true">${esc(p.numero)}<small>${esc(p.unita)}</small></p>
+${titolo("h1", p.titolo, { classe: "h1 h1--medio" })}
+<p class="intro">${fmt(p.frase)}</p>
+${pulsante("#modulo", p.cta)}
+</div>
+<div class="ap-solare__foto">${foto("fotovoltaico-tetto", t.alt["fotovoltaico-tetto"], { subito: true, sizes: "(min-width: 960px) 40vw, 100vw" })}</div>
+</section>
+<section class="sezione contenitore" aria-labelledby="t-fasi">
+${eti(p.fasi.eti)}${titolo("h2", p.fasi.titolo, { id: "t-fasi", classe: "h2" })}
+<ol class="linea-tempo">${p.fasi.voci.map((v, i) => `<li data-rivela="su" style="--ritardo:${i * 120}ms"><span class="linea-tempo__punto c-${["E", "C", "A1", "A4"][i]}" aria-hidden="true"></span><p class="eti">${pad(i + 1)}</p><h3 class="h3">${fmt(v.titolo)}</h3><p>${fmt(v.testo)}</p></li>`).join("")}</ol>
+</section>
+<section class="riquadro-scuro" aria-labelledby="t-dogane">
+<div class="contenitore riquadro-scuro__griglia">
+<div>${eti(p.dogane.eti)}${titolo("h2", p.dogane.titolo, { id: "t-dogane", classe: "h2" })}<p class="intro">${fmt(p.dogane.frase)}</p></div>
+<ul class="spunte spunte--chiare">${p.dogane.voci.map((v) => `<li>${fmt(v)}</li>`).join("")}</ul>
+</div>
+</section>
+<section class="sezione contenitore foto-larga" aria-label="${esc(t.alt["casa-fotovoltaico"])}">
+${foto("casa-fotovoltaico", t.alt["casa-fotovoltaico"], { sizes: "(min-width: 1320px) 1320px, 100vw" })}
+</section>
+${finale(lingua, { servizio: "solare", titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "ingegnere-pannelli" })}`;
+  pagina(lingua, "solare", corpo, { schemi: [schemaServizio(lingua, "solare")], ancora: "#modulo" });
+}
+
+function paginaBonus(lingua) {
+  const t = T[lingua.codice], p = t.bonus;
+  const corpo = `<section class="ap-bonus">
+<div class="contenitore">
+${briciole(lingua, "bonus")}
+${titolo("h1", p.titolo, { classe: "h1" })}
+<p class="intro">${fmt(p.frase)}</p>
+${pulsante("#modulo", p.cta, "pulsante--inchiostro")}
+</div>
+</section>
+<section class="sezione contenitore" aria-labelledby="t-come">
+<div class="testa testa--lato"><div>${eti(p.come.eti)}${titolo("h2", p.come.titolo, { id: "t-come", classe: "h2" })}</div><p class="intro">${fmt(p.come.frase)}</p></div>
+<ol class="percorso">${p.come.voci.map((v, i) => `<li data-rivela="su" style="--ritardo:${i * 100}ms"><span class="percorso__n">${pad(i + 1)}</span><h3 class="h3">${fmt(v.titolo)}</h3><p>${fmt(v.testo)}</p></li>`).join("")}</ol>
+</section>
+<section class="diviso" aria-labelledby="t-quali">
+<div class="diviso__foto">${foto("cappotto", t.alt.cappotto, { sizes: "(min-width: 960px) 50vw, 100vw" })}</div>
+<div class="diviso__testo">
+${eti(p.quali.eti)}${titolo("h2", p.quali.titolo, { id: "t-quali", classe: "h2" })}
+<p>${fmt(p.quali.frase)}</p>
+<ul class="etichette">${p.quali.voci.map((v) => `<li>${fmt(v)}</li>`).join("")}</ul>
+<p class="nota">${fmt(p.quali.nota)}</p>
+</div>
+</section>
+<section class="parcella contenitore stretto" aria-labelledby="t-parcella">
+${divisore()}
+${titolo("h2", p.parcella.titolo, { id: "t-parcella", classe: "h2" })}
+<p class="intro">${fmt(p.parcella.frase)}</p>
+</section>
+<section class="sezione sezione--carta2" aria-labelledby="t-faq">
+<div class="contenitore faq-griglia"><div class="faq-griglia__testa">${titolo("h2", t.ui.faq, { id: "t-faq", classe: "h2" })}</div>${faq(p.faq)}</div>
+</section>
+${finale(lingua, { servizio: "bonus", titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "torino-tetti" })}`;
+  pagina(lingua, "bonus", corpo, { schemi: [schemaServizio(lingua, "bonus"), schemaFaq(p.faq)], ancora: "#modulo" });
+}
+
+function paginaCondominio(lingua) {
+  const t = T[lingua.codice], p = t.condominio;
+  const corpo = `<section class="ap-condominio">
+<div class="ap-condominio__foto">${foto("condominio-facciate", t.alt["condominio-facciate"], { subito: true, sizes: "(min-width: 960px) 50vw, 100vw" })}</div>
+<div class="ap-condominio__testo">
+${briciole(lingua, "condominio")}
+${titolo("h1", p.titolo, { classe: "h1 h1--medio" })}
+<p class="intro">${fmt(p.frase)}</p>
+${pulsante("#modulo", p.cta)}
+</div>
+</section>
+<section class="sezione contenitore" aria-labelledby="t-schema">
+<div class="testa testa--centro">${eti(p.schema.eti)}${titolo("h2", p.schema.titolo, { id: "t-schema", classe: "h2" })}</div>
+<div class="hub" data-rivela="su">
+<p class="hub__nodo">${fmt(p.schema.amministratore)}</p>
+<span class="hub__linea" aria-hidden="true"></span>
+<p class="hub__nodo hub__nodo--centro">${logo()}<span class="sr">StudioVela49</span></p>
+<span class="hub__linea" aria-hidden="true"></span>
+<ul class="hub__rami">${p.schema.altri.map((a) => `<li>${fmt(a)}</li>`).join("")}</ul>
+</div>
+<p class="centro nota">${fmt(p.schema.nota)}</p>
+</section>
+<section class="sezione sezione--carta2" aria-labelledby="t-cosa">
+<div class="contenitore">
+${eti(p.cosa.eti)}${titolo("h2", p.cosa.titolo, { id: "t-cosa", classe: "h2" })}
+<ul class="griglia-2">${p.cosa.voci.map((v, i) => `<li data-rivela="su" style="--ritardo:${(i % 2) * 100}ms"><h3 class="h3">${fmt(v.titolo)}</h3><p>${fmt(v.testo)}</p></li>`).join("")}</ul>
+</div>
+</section>
+<section class="citazione contenitore stretto">
+<blockquote data-rivela="su"><p>${fmt(p.citazione)}</p></blockquote>
+</section>
+${finale(lingua, { servizio: "condominio", titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "condominio-balconi" })}`;
+  pagina(lingua, "condominio", corpo, { schemi: [schemaServizio(lingua, "condominio")], ancora: "#modulo" });
+}
+
+function paginaAntincendio(lingua) {
+  const t = T[lingua.codice], p = t.antincendio;
+  const corpo = `<section class="ap-incendio">
+<div class="contenitore ap-incendio__griglia">
+<div class="ap-incendio__testo">
+${briciole(lingua, "antincendio")}
+${eti(p.eti)}
+${titolo("h1", p.titolo, { classe: "h1 h1--medio" })}
+<p class="intro">${fmt(p.frase)}</p>
+${pulsante("#modulo", p.cta)}
+</div>
+<div class="ap-incendio__foto">${foto("estintore", t.alt.estintore, { subito: true, sizes: "(min-width: 960px) 26vw, 60vw" })}</div>
+</div>
+</section>
+<section class="sezione contenitore due" aria-labelledby="t-cosa">
+<div>${titolo("h2", p.cosa.titolo, { id: "t-cosa", classe: "h2" })}${p.cosa.testi.map((x) => `<p>${fmt(x)}</p>`).join("")}</div>
+${elenco(p.cosa.voci, "piccoli")}
+</section>
+${finale(lingua, { servizio: "antincendio", titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "progetto-tavolo" })}`;
+  pagina(lingua, "antincendio", corpo, { schemi: [schemaServizio(lingua, "antincendio")], ancora: "#modulo" });
+}
+
+function paginaStudi(lingua) {
+  const t = T[lingua.codice], p = t.studi;
+  const corpo = `<section class="ap-studi contenitore">
+${briciole(lingua, "studi")}
+<div class="ap-studi__griglia">
+<div class="ap-studi__testa">
+${titolo("h1", p.titolo, { classe: "h1" })}
+<p class="intro">${fmt(p.frase)}</p>
+${pulsante("#modulo", p.cta)}
+</div>
+<ol class="sommario">${p.voci.map((v, i) => `<li data-rivela="su" style="--ritardo:${i * 60}ms"><span class="sommario__n">${pad(i + 1)}</span><span class="sommario__nome">${fmt(v)}</span></li>`).join("")}</ol>
+</div>
+</section>
+<section class="diviso" aria-labelledby="t-come">
+<div class="diviso__foto">${foto("ingegneri-progetto", t.alt["ingegneri-progetto"], { sizes: "(min-width: 960px) 50vw, 100vw" })}</div>
+<div class="diviso__testo">
+${eti(p.come.eti)}${titolo("h2", p.come.titolo, { id: "t-come", classe: "h2" })}
+${p.come.testi.map((x) => `<p>${fmt(x)}</p>`).join("")}
+<p class="nota">${fmt(p.come.nota)}</p>
+</div>
+</section>
+${finale(lingua, { servizio: "studi", titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "torino-panorama" })}`;
+  pagina(lingua, "studi", corpo, { schemi: [schemaServizio(lingua, "studi")], ancora: "#modulo" });
+}
+
+function paginaChiSiamo(lingua) {
+  const t = T[lingua.codice], p = t.chiSiamo;
+  const corpo = `<section class="ap-chi">
+<div class="ap-chi__foto">${foto("torino-panorama", t.alt["torino-panorama"], { subito: true, sizes: "100vw" })}</div>
+<div class="contenitore ap-chi__testo">
+${briciole(lingua, "chiSiamo")}
+${titolo("h1", p.titolo, { classe: "h1" })}
+<p class="intro">${fmt(p.frase)}</p>
+</div>
+</section>
+<section class="sezione contenitore profilo" aria-labelledby="t-profilo">
+<div class="profilo__ritratto">${foto("ing-natale-lombardo", t.alt["ing-natale-lombardo"], { sizes: "160px", rivela: false })}<p><strong>Ing. Natale Lombardo</strong><br>${esc(p.ruolo)}</p></div>
+<div class="profilo__testo">
+${titolo("h2", p.profilo.titolo, { id: "t-profilo", classe: "h2" })}
+${p.profilo.testi.map((x) => `<p>${fmt(x)}</p>`).join("")}
+</div>
+</section>
+<section class="sezione sezione--carta2" aria-labelledby="t-tappe">
+<div class="contenitore">
+${eti(p.tappe.eti)}${titolo("h2", p.tappe.titolo, { id: "t-tappe", classe: "h2" })}
+<ol class="tappe">${p.tappe.voci.map((v, i) => `<li data-rivela="su" style="--ritardo:${i * 90}ms"><span class="tappe__anno">${fmt(v.anno)}</span><span class="tappe__barra c-${CLASSI[9 - i * 3] || "A4"}" aria-hidden="true"></span><p>${fmt(v.testo)}</p></li>`).join("")}</ol>
+</div>
+</section>
+<section class="sezione contenitore due" aria-labelledby="t-titoli">
+<div>${eti(p.titoli.eti)}${titolo("h2", p.titoli.titolo, { id: "t-titoli", classe: "h2" })}</div>
+<ul class="spunte">${p.titoli.voci.map((v) => `<li data-rivela="su">${fmt(v)}</li>`).join("")}</ul>
+</section>
+<section class="valori valori--compatti" aria-labelledby="t-valori">
+<div class="contenitore">
+<h2 id="t-valori" class="eti eti--chiara">${fmt(t.home.valori.eti)}</h2>
+<ul class="valori__parole">${t.home.valori.parole.map((x, i) => `<li data-rivela="su" style="--ritardo:${i * 100}ms"><span class="valori__n" aria-hidden="true">${pad(i + 1)}</span>${fmt(x)}</li>`).join("")}</ul>
+</div>
+</section>
+<section class="sezione contenitore due" aria-labelledby="t-rete">
+<div>${titolo("h2", p.rete.titolo, { id: "t-rete", classe: "h2" })}<p>${fmt(p.rete.testo)}</p></div>
+<div><p class="eti">${fmt(p.rete.strumentiEti)}</p><ul class="etichette">${p.rete.strumenti.map((x) => `<li>${fmt(x)}</li>`).join("")}</ul></div>
+</section>
+${finale(lingua, { titoloSez: p.finaleTitolo, frase: p.finaleFrase, fotoNome: "torino-mole" })}`;
+  pagina(lingua, "chiSiamo", corpo, { schemi: [schemaPersona(lingua)], ancora: "#modulo" });
 }
 
 function paginaContatti(lingua) {
-  const t = testi[lingua.codice], c = t.contatti, f = t.form;
-  const linkPrivacy = `<a href="${url(lingua, "privacy")}" target="_blank">${esc(f.privacyLink)}</a>`;
-  const mappaUrl = `https://maps.google.com/maps?q=${encodeURIComponent(I.ricercaMappa || indirizzoCompleto)}&z=15&output=embed`;
-  const mappsLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(I.ricercaMappa || indirizzoCompleto)}`;
-  const corpo = intestazionePagina(c.etichetta, c.titolo, c.intro) + `<section class="sezione sezione--compatta">
-<div class="contenitore contatti-griglia">
-<div class="riquadro">
-<h2>${f.titolo}</h2>
-<form class="form" name="contatti" method="POST" action="${url(lingua, "grazie")}" data-netlify="true" netlify-honeypot="bot-field">
-<input type="hidden" name="form-name" value="contatti">
-<input type="hidden" name="lingua" value="${lingua.codice}">
-<p class="nascosto" aria-hidden="true"><label>Non compilare questo campo <input name="bot-field" tabindex="-1" autocomplete="off"></label></p>
-<p class="nota">${esc(f.obbligatori)}</p>
-<div class="campo"><label for="f-nome">${esc(f.nome)} *</label><input id="f-nome" name="nome" type="text" autocomplete="name" required maxlength="120"></div>
-<div class="campo-doppio">
-<div class="campo"><label for="f-email">${esc(f.email)} *</label><input id="f-email" name="email" type="email" autocomplete="email" required maxlength="160"></div>
-<div class="campo"><label for="f-tel">${esc(f.telefono)} <span class="facoltativo">(${esc(f.facoltativo)})</span></label><input id="f-tel" name="telefono" type="tel" autocomplete="tel" maxlength="40"></div>
+  const t = T[lingua.codice], p = t.contatti;
+  const mappa = `https://maps.google.com/maps?q=${mappaRicerca}&z=16&output=embed&hl=${lingua.codice}`;
+  const mappaLink = `https://www.google.com/maps/search/?api=1&query=${mappaRicerca}`;
+  const corpo = `<section class="ap-contatti contenitore">
+<div class="ap-contatti__testa">
+${briciole(lingua, "contatti")}
+${titolo("h1", p.titolo, { classe: "h1" })}
+<p class="intro">${fmt(p.frase)}</p>
 </div>
-<div class="campo"><label for="f-motivo">${esc(f.motivo)}</label><select id="f-motivo" name="motivo">${f.motivi.map((m) => `<option>${esc(m)}</option>`).join("")}</select></div>
-<div class="campo"><label for="f-msg">${esc(f.messaggio)} *</label><textarea id="f-msg" name="messaggio" rows="6" required maxlength="4000"></textarea></div>
-<div class="campo campo--check"><input id="f-privacy" name="privacy" type="checkbox" value="si" required><label for="f-privacy">${esc(f.privacy).replace("{linkPrivacy}", linkPrivacy)} *</label></div>
-<button class="pulsante pulsante--grande" type="submit">${esc(f.invia)}${icona("freccia")}</button>
-</form>
-</div>
-<div class="riquadro riquadro--info">
-<h2>${c.infoTitolo}</h2>
-${azioniContatto(t, { messaggio: "" })}
-<p class="info-riga">${icona("posizione")}<span><strong>${esc(t.ui.indirizzo)}</strong><br>${esc(indirizzoCompleto)}<br>${linkEsterno(mappsLink, esc(t.ui.indicazioni), t)}</span></p>
-<p class="info-riga">${icona("telefono")}<span><a href="${esc(telLink())}">${esc(C.contatti.telefonoVisibile)}</a></span></p>
-<p class="info-riga">${icona("email")}<span><a href="mailto:${esc(C.contatti.email)}">${esc(C.contatti.email)}</a></span></p>
-<div class="info-riga">${icona("orologio")}<div><strong>${esc(t.ui.orari)}</strong>${tabellaOrari(t)}</div></div>
-${social(t)}
-</div>
+<div class="ap-contatti__griglia">
+${modulo(lingua, { titoloForm: p.moduloTitolo })}
+<aside class="recapiti" aria-label="${esc(p.recapiti)}">
+<p class="recapiti__grande"><a href="${telLink}">${icona("telefono")}${esc(K.telefonoVisibile)}</a></p>
+${C.whatsappAttivo ? `<p><a href="${waLink(t)}" rel="noopener" target="_blank">${icona("whatsapp")}${esc(t.ui.whatsappScrivi)}<span class="sr"> (${esc(t.ui.nuovaFinestra)})</span></a> ${fmt("[DA CONFERMARE]")}</p>` : ""}
+<p><a href="mailto:${K.email}">${icona("email")}${K.email}</a></p>
+<dl class="recapiti__dati">
+<div><dt>${esc(t.ui.indirizzo)}</dt><dd>${esc(I.via)}<br>${esc(I.cap)} ${esc(I.citta)} (${esc(I.provincia)})</dd></div>
+<div><dt>${esc(t.ui.orari)}</dt><dd>${fmt(p.orari)}</dd></div>
+<div><dt>${esc(t.ui.comeArrivare)}</dt><dd>${fmt(p.arrivare)}</dd></div>
+<div><dt>${esc(t.ui.piva)}</dt><dd>${C.studio.partitaIva}</dd></div>
+</dl>
+</aside>
 </div>
 </section>
-<section class="sezione sezione--alt" aria-labelledby="t-mappa">
+<section class="sezione sezione--carta2" aria-labelledby="t-mappa">
 <div class="contenitore">
-<div class="intestazione"><h2 id="t-mappa">${c.mappaTitolo}</h2></div>
-<div class="mappa" data-mappa="${esc(mappaUrl)}" data-titolo="${esc(t.mappa.titolo)}">
-<div class="mappa__segnaposto">
+<h2 id="t-mappa" class="h3">${fmt(p.mappaTitolo)}</h2>
+<div class="mappa" data-mappa="${esc(mappa)}" data-titolo="${esc(p.mappaTitolo)}">
+<div class="mappa__vuota">
 ${icona("posizione", "icona mappa__icona")}
-<p>${esc(t.mappa.testo)}</p>
-<button type="button" class="pulsante" data-mappa-carica>${esc(t.mappa.pulsante)}</button>
-${linkEsterno(mappsLink, esc(t.mappa.apriInMaps), t, "link-semplice")}
+<p>${fmt(p.mappaTesto)}</p>
+<p><button type="button" class="pulsante pulsante--inchiostro" data-mappa-carica>${esc(p.mappaPulsante)}</button></p>
+<p><a href="${mappaLink}" rel="noopener" target="_blank">${esc(p.mappaApri)}${icona("esterno")}<span class="sr"> (${esc(t.ui.nuovaFinestra)})</span></a></p>
 </div>
 </div>
 </div>
 </section>`;
-  pagina(lingua, "contatti", corpo, { schema: true });
+  pagina(lingua, "contatti", corpo, { ancora: "#modulo" });
 }
 
-function paginaPrivacy(lingua) {
-  const t = testi[lingua.codice], p = t.privacy;
-  const corpo = intestazionePagina("", p.titolo, esc(p.aggiornamento)) + `<section class="sezione sezione--compatta">
-<div class="contenitore stretto testo-lungo">
-${p.sezioni.map((s) => `<h2>${s.titolo}</h2>\n<p>${s.testo}</p>`).join("\n")}
-<p><button type="button" class="pulsante pulsante--chiaro" data-cookie-preferenze>${esc(t.ui.preferenzeCookie)}</button></p>
-</div>
+function paginaTesto(lingua, chiave) {
+  const t = T[lingua.codice], p = t[chiave];
+  const corpo = `<section class="testa-pagina contenitore stretto">
+${briciole(lingua, chiave)}
+${titolo("h1", p.titolo, { classe: "h1 h1--medio" })}
+${p.aggiornamento ? `<p class="nota">${fmt(p.aggiornamento)}</p>` : ""}
+</section>
+<section class="sezione sezione--stretta contenitore stretto testo-lungo">
+${p.sezioni.map((s) => `<h2>${fmt(s.titolo)}</h2>\n${[].concat(s.testo).map((x) => x.startsWith("<") ? fmt(x) : `<p>${fmt(x)}</p>`).join("\n")}`).join("\n")}
 </section>`;
-  pagina(lingua, "privacy", corpo);
+  pagina(lingua, chiave, corpo);
 }
 
-function paginaMessaggio(lingua, chiave, dati, file) {
-  const t = testi[lingua.codice];
-  const corpo = `<section class="sezione messaggio">
-<div class="contenitore stretto">
-${icona(chiave === "grazie" ? "check" : "montagna", "icona messaggio__icona")}
-<h1>${dati.titolo}</h1>
-<p class="intro">${dati.testo}</p>
-<div class="azioni azioni--centro">
-<a class="pulsante" href="${url(lingua, "home")}">${esc(dati.torna)}</a>
-${chiave === "errore" ? `<a class="pulsante pulsante--chiaro" href="${url(lingua, "contatti")}">${esc(t.pagine.contatti.menu)}</a>` : ""}
-</div>
-</div>
+function paginaCrediti(lingua) {
+  const t = T[lingua.codice], p = t.crediti;
+  const righe = C.creditiFoto.map((c) => `<tr><td>${foto(c.nome, "", { sizes: "96px", rivela: false })}</td><td>${esc(t.alt[c.nome])}</td><td>${esc(c.autore)}</td><td><a href="${c.fonte}" rel="noopener" target="_blank">Pexels${icona("esterno")}<span class="sr"> (${esc(t.ui.nuovaFinestra)})</span></a></td></tr>`).join("");
+  const corpo = `<section class="testa-pagina contenitore stretto">
+${briciole(lingua, "crediti")}
+${titolo("h1", p.titolo, { classe: "h1 h1--medio" })}
+<p class="intro">${fmt(p.frase)}</p>
+</section>
+<section class="sezione sezione--stretta contenitore stretto">
+<div class="tabella-scorre" tabindex="0" role="region" aria-label="${esc(p.titolo)}"><table class="crediti"><thead><tr><th scope="col"><span class="sr">${esc(p.colFoto)}</span></th><th scope="col">${esc(p.colSoggetto)}</th><th scope="col">${esc(p.colAutore)}</th><th scope="col">${esc(p.colFonte)}</th></tr></thead><tbody>${righe}</tbody></table></div>
+<p class="nota">${fmt(p.nota)}</p>
+<h2 class="h3">${fmt(p.fontTitolo)}</h2>
+<p>${fmt(p.font)}</p>
+</section>`;
+  pagina(lingua, "crediti", corpo);
+}
+
+function paginaMessaggio(lingua, chiave, file) {
+  const t = T[lingua.codice], p = t[chiave];
+  const corpo = `<section class="messaggio contenitore stretto">
+${scala({ evidenzia: chiave === "grazie" ? "A4" : "G", classe: "scala--mini" })}
+${titolo("h1", p.titolo, { classe: "h1 h1--medio" })}
+<p class="intro">${fmt(p.frase)}</p>
+${p.mail ? `<p class="nota messaggio__mail" hidden>${fmt(p.mail)}</p>` : ""}
+${p.altro ? `<p lang="${p.altroLingua || ""}" class="nota">${p.altro}</p>` : ""}
+<p class="messaggio__azioni">${pulsante(url(lingua, "home"), p.torna)} ${linkFreccia(url(lingua, "servizi"), t.ui.tuttiServizi)}</p>
 </section>`;
   pagina(lingua, chiave, corpo, { noindex: true, file });
 }
 
-/* ---------------------------------------------------------------
-   FILE PER GOOGLE E NETLIFY
-   --------------------------------------------------------------- */
+/* =====================================================================
+   FILE TECNICI: sitemap, robots, redirect dai vecchi indirizzi
+   ===================================================================== */
 function fileTecnici() {
   const oggi = new Date().toISOString().slice(0, 10);
-  const urls = PAGINE_INDICIZZATE.map((k) => C.lingue.map((l) => `<url>
-<loc>${assoluto(url(l, k))}</loc>
-<lastmod>${oggi}</lastmod>
-${C.lingue.map((x) => `<xhtml:link rel="alternate" hreflang="${x.codice}" href="${assoluto(url(x, k))}"/>`).join("\n")}
-<xhtml:link rel="alternate" hreflang="x-default" href="${assoluto(url(PRINCIPALE, k))}"/>
-</url>`).join("\n")).join("\n");
-  scriviFile("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">
-${urls}
-</urlset>
-`);
-  scriviFile("robots.txt", `User-agent: *\nAllow: /\n\nSitemap: ${assoluto("/sitemap.xml")}\n`);
+  const voci = INDICIZZATE.map((k) => C.lingue.map((l) => `<url><loc>${assoluto(url(l, k))}</loc><lastmod>${oggi}</lastmod>
+${C.lingue.map((x) => `<xhtml:link rel="alternate" hreflang="${x.codice}" href="${assoluto(url(x, k))}"/>`).join("")}<xhtml:link rel="alternate" hreflang="x-default" href="${assoluto(url(PRINCIPALE, k))}"/></url>`).join("\n")).join("\n");
+  scrivi("sitemap.xml", `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">\n${voci}\n</urlset>\n`);
+  // In anteprima Google non deve indicizzare: lo dice già il meta "noindex" (robots.txt deve lasciarlo leggere)
+  scrivi("robots.txt", `User-agent: *\nAllow: /\n\nSitemap: ${SITO}${BASE}/sitemap.xml\n`);
 
-  // Pagina 404 nella lingua giusta per ogni cartella
-  const redirects = C.lingue.filter((l) => l.cartella).map((l) => `/${l.cartella}/*  /${l.cartella}/404.html  404`).join("\n");
-  scriviFile("_redirects", `# Generato da build.js\n${redirects}\n`);
-
-  scriviFile("_headers", `# Generato da build.js
+  // Vecchi indirizzi del sito 2012 → nuove pagine
+  const vecchi = Object.entries(C.vecchiIndirizzi).map(([da, k]) => [da, url(PRINCIPALE, k)]);
+  const lingue404 = C.lingue.filter((l) => l.cartella).map((l) => `${BASE}/${l.cartella}/*  ${BASE}/${l.cartella}/404.html  404`).join("\n");
+  scrivi("_redirects", `# Generato da build.js (Netlify)\n${vecchi.map(([da, a]) => `${BASE}${da}  ${a}  301`).join("\n")}\n${lingue404}\n`);
+  scrivi(".htaccess", `# Generato da build.js (hosting Apache, es. Aruba)
+ErrorDocument 404 ${BASE}/404.html
+<IfModule mod_rewrite.c>
+RewriteEngine On
+${vecchi.map(([da, a]) => `RewriteRule ^${da.replace(/^\//, "").replace(/\./g, "\\.").replace(/\/$/, "/?")}$ ${a} [R=301,L]`).join("\n")}
+</IfModule>
+<IfModule mod_expires.c>
+ExpiresActive On
+ExpiresByType font/woff2 "access plus 1 year"
+ExpiresByType image/avif "access plus 1 year"
+ExpiresByType image/webp "access plus 1 year"
+ExpiresByType image/jpeg "access plus 1 year"
+ExpiresByType text/css "access plus 1 year"
+ExpiresByType application/javascript "access plus 1 year"
+</IfModule>
+${ANTEPRIMA ? '<IfModule mod_headers.c>\nHeader set X-Robots-Tag "noindex"\n</IfModule>\n' : ""}`);
+  scrivi("_headers", `# Generato da build.js (Netlify)
 /*
   X-Content-Type-Options: nosniff
-  X-Frame-Options: SAMEORIGIN
   Referrer-Policy: strict-origin-when-cross-origin
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), interest-cohort=()
-${C.demo ? "  X-Robots-Tag: noindex\n" : ""}
-/assets/font/*
-  Cache-Control: public, max-age=31536000, immutable
-/assets/css/*
-  Cache-Control: public, max-age=31536000, immutable
-/assets/js/*
+${ANTEPRIMA ? "  X-Robots-Tag: noindex\n" : ""}/assets/*
   Cache-Control: public, max-age=31536000, immutable
 `);
-
-  const c = TEMA.colori;
-  const iniziale = esc(Array.from(A.nome.trim())[0] || "•");
-  scriviFile("favicon.svg", `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${c.primarioScuro}"/><text x="32" y="45" font-family="Georgia, serif" font-size="38" text-anchor="middle" fill="${c.accentoSuScuro || c.accento}">${iniziale}</text></svg>`);
+  // Su GitHub Pages non esistono redirect veri: una piccola pagina che rimanda
+  for (const [da, a] of vecchi) {
+    if (da === "/" ) continue;
+    const dest = da.endsWith("/") ? path.join(da, "index.html") : path.join(da, "index.html");
+    scrivi(dest.replace(/^\//, ""), `<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="robots" content="noindex"><link rel="canonical" href="${assoluto(a)}"><meta http-equiv="refresh" content="0; url=${a}"><title>StudioVela49</title></head><body><p><a href="${a}">StudioVela49</a></p></body></html>\n`);
+  }
+  scrivi(".nojekyll", "");
 }
 
-/* ---------------------------------------------------------------
+/* =====================================================================
    AVVIO
-   --------------------------------------------------------------- */
+   ===================================================================== */
 fs.rmSync(USCITA, { recursive: true, force: true });
 fs.mkdirSync(USCITA, { recursive: true });
-fs.cpSync(path.join(RADICE, "assets"), path.join(USCITA, "assets"), { recursive: true });
+fs.cpSync(path.join(RADICE, "assets"), path.join(USCITA, "assets"), { recursive: true, filter: (s) => !s.endsWith("indice.json") });
 
 for (const lingua of C.lingue) {
-  const t = testi[lingua.codice];
   paginaHome(lingua);
-  paginaChiSiamo(lingua);
   paginaServizi(lingua);
-  paginaGalleria(lingua);
+  paginaApe(lingua);
+  paginaDiagnosi(lingua);
+  paginaSolare(lingua);
+  paginaBonus(lingua);
+  paginaCondominio(lingua);
+  paginaAntincendio(lingua);
+  paginaStudi(lingua);
+  paginaChiSiamo(lingua);
   paginaContatti(lingua);
-  paginaPrivacy(lingua);
-  paginaMessaggio(lingua, "grazie", t.grazie);
-  paginaMessaggio(lingua, "errore", t.errore, path.join(lingua.cartella || "", "404.html"));
+  paginaTesto(lingua, "privacy");
+  paginaTesto(lingua, "cookie");
+  paginaCrediti(lingua);
+  paginaMessaggio(lingua, "grazie");
+  paginaMessaggio(lingua, "errore", path.join(lingua.cartella || "", "404.html"));
 }
 fileTecnici();
 
-const nPagine = C.lingue.length * 8;
-console.log(`\n✔ Sito "${A.nome}" generato in dist/: ${nPagine} pagine in ${C.lingue.length} lingue (${C.lingue.map((l) => l.codice).join(", ")}).`);
-console.log(`  Stile: ${nomeStile}  ·  3D: ${EFFETTI.profondita3d ? "acceso" : "spento"}  ·  animazioni: ${EFFETTI.animazioni ? "accese" : "spente"}`);
-console.log(`  Sezioni attive: ${sezioniAttive().join(", ") || "nessuna"}${C.demo ? "  ·  MODALITÀ DEMO (non indicizzato)" : ""}`);
-if (segnapostoUsati.length) {
-  console.log(`\n▢ ${segnapostoUsati.length} foto ancora da caricare in assets/img/ (ora c'è un disegno segnaposto):`);
-  for (const f of segnapostoUsati) console.log("  - " + f);
-}
-if (avvisi.length) {
-  console.log(`\n⚠ ${avvisi.length} avvisi da controllare:`);
-  for (const a of [...new Set(avvisi)]) console.log("  - " + a);
-}
+// Elenco dei [DA CONFERMARE] rimasti nei testi (per ricordarli)
+let dc = 0;
+for (const l of C.lingue) dc += (JSON.stringify(T[l.codice]).match(/DA CONFERMARE/g) || []).length;
+console.log(`✔ StudioVela49 generato in dist/: ${C.lingue.length * 16} pagine in ${C.lingue.map((l) => l.codice).join(", ")}`);
+console.log(`  Percorso base: "${BASE || "/"}"  ·  indirizzo: ${SITO}${BASE}/  ·  ${ANTEPRIMA ? "ANTEPRIMA (noindex)" : "sito pubblico (indicizzabile)"}`);
+console.log(`  Segnaposto [DA CONFERMARE] nei testi: ${dc} (elenco in docs/DA-CONFERMARE.md)`);
+if (avvisi.length) { console.log(`⚠ ${avvisi.length} avvisi:`); for (const a of new Set(avvisi)) console.log("  - " + a); }

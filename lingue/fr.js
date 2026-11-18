@@ -1,281 +1,383 @@
 /* =====================================================================
-   TESTI IN FRANCESE  (stessa struttura di it.js: vedi le istruzioni lì)
-   I prezzi devono essere uguali a quelli di it.js:
-   il motore ti avvisa se non lo sono.
+   TESTI IN ITALIANO — StudioVela49
+   Cambia solo quello che sta tra le virgolette.
+   [DA CONFERMARE] = dato da chiedere all'ing. Lombardo (elenco in docs/DA-CONFERMARE.md)
    ===================================================================== */
-
 module.exports = {
-
   pagine: {
-    home:     { percorso: "",                       menu: "Accueil",      titolo: "{nome} – Restaurant, chambres et boutique à {citta}", descrizione: "Cuisine valdôtaine, chambres avec vue sur le Mont-Blanc et produits du terroir à {citta}. Une maison de famille au pied des Alpes depuis 1962." },
-    chiSiamo: { percorso: "a-propos",               menu: "Qui sommes-nous", titolo: "Qui sommes-nous – Notre histoire depuis 1962", descrizione: "Trois générations, une ancienne grange en bois et en pierre et la passion de la cuisine de montagne : découvrez l'histoire de {nome} à {citta}." },
-    servizi:  { percorso: "services",               menu: "Services",     titolo: "Menu, chambres et boutique", descrizione: "Notre menu de plats traditionnels valdôtains, nos chambres face au Mont-Blanc et les produits du terroir de notre boutique à {citta}." },
-    galleria: { percorso: "galerie",                menu: "Galerie",      titolo: "Galerie photos", descrizione: "Les photos de {nome} : la salle, les chambres, nos plats et les montagnes de {citta} en toute saison." },
-    contatti: { percorso: "contact",                menu: "Contact",      titolo: "Contact, horaires et accès", descrizione: "Téléphone, WhatsApp, e-mail, horaires d'ouverture et plan d'accès pour rejoindre {nome} à {citta}. Écrivez-nous pour réserver ou vous renseigner." },
-    privacy:  { percorso: "confidentialite-cookies", menu: "Confidentialité et cookies", titolo: "Confidentialité et cookies", descrizione: "Informations sur le traitement des données personnelles et l'utilisation des cookies sur le site de {nome}." },
-    grazie:   { percorso: "merci",                  menu: "Merci",        titolo: "Message envoyé", descrizione: "Merci de nous avoir écrit." },
-    errore:   { percorso: "",                       menu: "Erreur",       titolo: "Page introuvable", descrizione: "La page que vous cherchez n'existe pas." },
+    home: { percorso: "", menu: "Home", titolo: "StudioVela49 | Ingegneria energetica a Torino: APE, diagnosi, solare", descrizione: "Studio dell'ing. Natale Lombardo in Via Vela 49 a Torino: certificazione energetica APE, diagnosi energetiche, impianti solari, bonus casa, condomini e prevenzione incendi." },
+    servizi: { percorso: "servizi/", menu: "Servizi", titolo: "Servizi di ingegneria energetica a Torino | StudioVela49", descrizione: "Tutti i servizi di StudioVela49 per privati e professionisti: APE, diagnosi, impianti solari, bonus e detrazioni, amministratori di condominio, antincendio, studi tecnici." },
+    ape: { percorso: "servizi/certificazione-energetica-ape/", menu: "Certificazione energetica (APE)", titolo: "Certificazione energetica APE a Torino | StudioVela49", descrizione: "Devi vendere o affittare casa a Torino? Ti serve l'APE. Lo redigiamo sempre dopo un sopralluogo: certificato valido fino a 10 anni." },
+    diagnosi: { percorso: "servizi/diagnosi-energetica/", menu: "Diagnosi energetica", titolo: "Diagnosi energetica a Torino per casa e azienda | StudioVela49", descrizione: "La diagnosi energetica misura i consumi reali della tua casa o azienda, trova i punti deboli e confronta costi e benefici degli interventi." },
+    solare: { percorso: "servizi/impianti-solari/", menu: "Impianti solari", titolo: "Consulenza impianti fotovoltaici e solari termici a Torino | StudioVela49", descrizione: "Fattibilità tecnica ed economica, scelta dell'impianto, pratiche e incentivi per fotovoltaico e solare termico. Pratiche doganali per impianti oltre 20 kWp." },
+    bonus: { percorso: "servizi/bonus-e-detrazioni/", menu: "Bonus e detrazioni", menuBreve: "Bonus casa", titolo: "Bonus e detrazioni per la casa a Torino: pratiche e APE | StudioVela49", descrizione: "Verifichiamo quali bonus e detrazioni valgono per i tuoi lavori, confrontiamo i preventivi e seguiamo la pratica fino all'APE post intervento." },
+    condominio: { percorso: "servizi/amministratori-di-condominio/", menu: "Amministratori di condominio", menuBreve: "Condomini", titolo: "Consulenza tecnica per amministratori di condominio a Torino | StudioVela49", descrizione: "Un unico riferimento tecnico per l'amministratore: assemblee, contabilizzazione del calore, risparmio energetico, raccolta e confronto dei preventivi." },
+    antincendio: { percorso: "servizi/prevenzione-incendi/", menu: "Prevenzione incendi", titolo: "Prevenzione incendi e SCIA antincendio a Torino | StudioVela49", descrizione: "Pratiche di prevenzione incendi con un professionista antincendio abilitato dal Ministero dell'Interno: SCIA, progetti e certificazioni." },
+    studi: { percorso: "servizi/consulenza-studi-tecnici/", menu: "Per studi tecnici", titolo: "Consulenza energetica per studi tecnici e professionisti | StudioVela49", descrizione: "Collaborazioni con studi tecnici: progettazione sostenibile, bandi e finanziamenti, rilievi, catasto, relazione Legge 10, pratiche doganali fotovoltaico." },
+    chiSiamo: { percorso: "chi-siamo/", menu: "Chi siamo", titolo: "Chi siamo: l'ing. Natale Lombardo e lo studio | StudioVela49", descrizione: "StudioVela49 nasce nel 2010 a Torino. L'ing. Natale Lombardo, ingegnere civile del Politecnico, si occupa di risparmio energetico di edifici e impianti." },
+    contatti: { percorso: "contatti/", menu: "Contatti", titolo: "Contatti e preventivo | StudioVela49, Via Vela 49 Torino", descrizione: "Richiedi un preventivo a StudioVela49: chiama il +39 339 270 9272, scrivi a info@studiovela49.it o compila il modulo. Via V. Vela 49, Torino." },
+    privacy: { percorso: "privacy/", menu: "Privacy", titolo: "Informativa privacy (GDPR) | StudioVela49", descrizione: "Come StudioVela49 tratta i dati personali di chi visita il sito e chiede un preventivo, secondo il Regolamento UE 2016/679 (GDPR)." },
+    cookie: { percorso: "cookie/", menu: "Cookie", titolo: "Cookie policy | StudioVela49", descrizione: "Il sito di StudioVela49 non usa cookie di profilazione né statistiche. Qui trovi cosa viene caricato e quando." },
+    crediti: { percorso: "crediti-foto/", menu: "Crediti foto", titolo: "Crediti delle fotografie | StudioVela49", descrizione: "Autori e licenze delle fotografie usate sul sito di StudioVela49." },
+    grazie: { percorso: "grazie/", menu: "Grazie", titolo: "Richiesta inviata | StudioVela49", descrizione: "Grazie, abbiamo ricevuto la tua richiesta." },
+    errore: { percorso: "404.html", menu: "Pagina non trovata", titolo: "Pagina non trovata | StudioVela49", descrizione: "La pagina che cerchi non esiste." },
   },
 
   ui: {
-    saltaAlContenuto: "Aller au contenu",
-    menuApri: "Ouvrir le menu",
-    menuChiudi: "Fermer le menu",
-    lingua: "Langue",
-    chiama: "Appeler",
-    whatsapp: "WhatsApp",
-    email: "E-mail",
-    contattaci: "Nous contacter",
-    scopriDiPiu: "En savoir plus",
-    indirizzo: "Adresse",
-    orari: "Horaires",
-    chiuso: "Fermé",
-    oggi: "Aujourd'hui",
-    giorni: { lun: "Lundi", mar: "Mardi", mer: "Mercredi", gio: "Jeudi", ven: "Vendredi", sab: "Samedi", dom: "Dimanche" },
-    indicazioni: "Itinéraire",
-    seguici: "Suivez-nous",
-    partitaIva: "N° TVA",
-    cin: "CIN",
-    preferenzeCookie: "Préférences cookies",
-    chiudi: "Fermer",
-    precedente: "Photo précédente",
-    successiva: "Photo suivante",
-    ingrandisci: "Ouvrir la photo en plein écran",
-    stelle: "{n} étoiles sur 5",
-    whatsappFisso: "Écrivez-nous sur WhatsApp",
-    demo: "Site d’exemple",
-    linkEsterno: "(s'ouvre dans un nouvel onglet)",
-    prenota: "Réserver",
-    scorri: "Défiler",
-    pausa: "Mettre en pause",
-    riproduci: "Reprendre",
-    recPrecedente: "Avis précédent",
-    recSuccessiva: "Avis suivant",
-    recensioni: "Avis",
+    salta: "Vai al contenuto", menu: "Menu principale", apriMenu: "Apri il menu", chiudiMenu: "Chiudi il menu", lingua: "Lingua",
+    home: "Home", briciole: "Sei qui", privati: "Privati", professionisti: "Professionisti", studio: "Lo studio", tuttiServizi: "Tutti i servizi",
+    richiediPreventivo: "Richiedi un preventivo", contattoRapido: "Contatto rapido", chiama: "Chiama", whatsapp: "WhatsApp", preventivo: "Preventivo",
+    whatsappScrivi: "Scrivici su WhatsApp", whatsappMessaggio: "Buongiorno, vorrei informazioni su un servizio di StudioVela49.", nuovaFinestra: "si apre in una nuova finestra",
+    indirizzo: "Indirizzo", orari: "Orari", comeArrivare: "Come arrivare", piva: "P. IVA", faq: "Domande frequenti", perChi: "Per chi lavoriamo",
+    piedeFrase: "Ingegneria energetica a Torino dal 2010. Sempre con sopralluogo.",
   },
 
-  cookie: {
-    testo: "Nous utilisons uniquement des cookies techniques. Avec votre accord, nous chargeons aussi la carte Google, qui peut utiliser des cookies tiers.",
-    accetta: "Accepter",
-    rifiuta: "Refuser",
-    info: "Lire la politique",
-  },
-  mappa: {
-    titolo: "Carte Google indiquant l'emplacement de {nome}",
-    testo: "La carte est fournie par Google et ne se charge qu'avec votre accord.",
-    pulsante: "Afficher la carte",
-    apriInMaps: "Ouvrir dans Google Maps",
-  },
-
-  home: {
-    heroEtichetta: "{citta} · Vallée d'Aoste",
-    heroTitolo: "{nome}",
-    heroSottotitolo: "Cuisine valdôtaine, chambres avec vue sur le Mont-Blanc et une petite boutique de produits de montagne. Depuis 1962.",
-    pulsantePrincipale: "Nous contacter",
-    pulsanteSecondario: "Voir le menu",
-    puntiForzaTitolo: "Pourquoi nous choisir",
-    puntiForzaIntro: "Depuis trois générations, nous accueillons ceux qui montent à la montagne comme on accueille un ami : avec un plat chaud, une chambre au calme et le temps de profiter de la vue.",
-    puntiForza: [
-      { icona: "montagna", titolo: "Vue sur le Mont-Blanc",  testo: "Depuis la salle et chaque chambre, on voit les plus hauts sommets d'Europe." },
-      { icona: "foglia",   titolo: "Produits du terroir",    testo: "Fontina, lard, miels et vins de plus de 40 petits producteurs de la vallée." },
-      { icona: "fuoco",    titolo: "Cuisine de famille",     testo: "Les recettes de grand-mère, mijotées au feu de bois comme autrefois." },
-      { icona: "posizione",titolo: "À deux pas du centre",   testo: "À 10 minutes à pied de la via Roma, avec parking privé gratuit." },
-    ],
-    anteprimaTitolo: "Ce que nous proposons",
-    anteprimaIntro: "Trois façons de vivre la montagne : à table, dans votre chambre et en l'emportant chez vous.",
-    anteprima: [
-      { titolo: "La cuisine",  testo: "Plats traditionnels valdôtains préparés avec des produits de saison.", foto: "anteprima-1.jpg", ancora: "menu" },
-      { titolo: "Les chambres", testo: "Trois chambres en mélèze, toutes avec vue sur les montagnes et petit-déjeuner inclus.", foto: "anteprima-2.jpg", ancora: "camere" },
-      { titolo: "La boutique", testo: "Fromages, charcuteries et liqueurs des producteurs que nous servons chaque jour à table.", foto: "anteprima-3.jpg", ancora: "catalogo" },
-    ],
-    recensioniTitolo: "Ils parlent de nous",
-    recensioni: [
-      { testo: "La meilleure soupe valpellinentze que j'aie jamais mangée. Personnel adorable et vue à couper le souffle.", autore: "Giulia R.", provenienza: "Turin", stelle: 5, fonte: "Avis d'exemple" },
-      { testo: "Chambre propre et chaleureuse, petit-déjeuner copieux avec gâteaux maison. Nous reviendrons pour la saison de ski !", autore: "Marc D.", provenienza: "Lyon", stelle: 5, fonte: "Avis d'exemple" },
-      { testo: "Une vraie ambiance familiale. Nous avons rapporté de la fontina et du génépi de la boutique : excellents.", autore: "Sarah T.", provenienza: "Londres", stelle: 4, fonte: "Avis d'exemple" },
-    ],
-    contattiTitolo: "Venez nous voir",
-    contattiTesto: "Pour réserver une table ou une chambre, appelez-nous, écrivez-nous sur WhatsApp ou par e-mail : nous répondons dans la journée.",
-  },
-
-  chiSiamo: {
-    etichetta: "Notre histoire",
-    titolo: "Une maison de famille au pied du Mont-Blanc",
-    intro: "En 1962, grand-mère Aurore a transformé le vieux grenier familial en une petite auberge pour les alpinistes de passage. Aujourd'hui, la troisième génération perpétue la même idée : accueillir chacun comme un ami.",
-    paragrafi: [
-      "La maison est une grange du XVIIIe siècle en pierre et en mélèze, restaurée en conservant les poutres, les planchers et le grand poêle en pierre ollaire qui chauffe encore la salle.",
-      "En cuisine, nous utilisons presque uniquement des produits de la Vallée d'Aoste : la fontina des alpages du Val Ferret, le lard d'Arnad, les légumes du potager derrière la maison. Le menu suit les saisons, car en montagne c'est la nature qui décide.",
-      "À l'étage se trouvent trois chambres, chacune dédiée à un sommet visible depuis sa fenêtre. Et à l'entrée, une petite boutique propose les produits que nous servons à table.",
-    ],
-    citazione: { testo: "En montagne, on devient vite amis : il suffit d'un plat chaud et d'une fenêtre sur les sommets.", autore: "Aurore, fondatrice" },
-    numeri: [
-      { valore: "1962", etichetta: "année d'ouverture" },
-      { valore: "3",    etichetta: "générations en cuisine" },
-      { valore: "40+",  etichetta: "producteurs locaux" },
-      { valore: "3",    etichetta: "chambres avec vue" },
-    ],
-    finaleTitolo: "Envie de nous rencontrer ?",
-    finaleTesto: "Passez nous voir ou écrivez-nous : nous serons ravis de vous conseiller un plat, une chambre ou une balade.",
-  },
-
-  servizi: {
-    etichetta: "{nome}",
-    titolo: "Cuisine, chambres et boutique",
-    intro: "Tout ce que vous trouverez chez nous : choisissez la rubrique qui vous intéresse.",
-  },
-
-  menu: {
-    titolo: "Le menu",
-    intro: "Plats traditionnels valdôtains, préparés chaque jour avec des produits de saison.",
-    categorie: [
-      { nome: "Entrées", piatti: [
-        { nome: "Planche de la Vallée", descrizione: "Lard d'Arnad AOP, mocetta, boudin, fontina AOP et miel de châtaignier", prezzo: "€ 16" },
-        { nome: "Tomini au four", descrizione: "Au miel de montagne et aux noix grillées", prezzo: "€ 12", veg: true },
-      ]},
-      { nome: "Premiers plats", piatti: [
-        { nome: "Soupe valpellinentze", descrizione: "Pain de seigle, chou de Milan, fontina et bouillon de viande", prezzo: "€ 15" },
-        { nome: "Gnocchis de pommes de terre au ragoût de cerf", descrizione: "Gnocchis faits main, ragoût mijoté six heures", prezzo: "€ 17" },
-        { nome: "Polenta concia", descrizione: "Polenta moulue à la meule, fontina et beurre d'alpage", prezzo: "€ 14", veg: true },
-      ]},
-      { nome: "Plats principaux", piatti: [
-        { nome: "Carbonade valdôtaine", descrizione: "Bœuf mijoté au vin rouge et aux épices, servi avec de la polenta", prezzo: "€ 22" },
-        { nome: "Côtelette à la valdôtaine", descrizione: "Veau pané à la fontina et au jambon cru", prezzo: "€ 24" },
-        { nome: "Truite de torrent aux herbes", descrizione: "Avec pommes de terre de montagne au four", prezzo: "€ 21" },
-      ]},
-      { nome: "Desserts", piatti: [
-        { nome: "Panna cotta au génépi", descrizione: "Aux fruits des bois", prezzo: "€ 7", veg: true },
-        { nome: "Mont-Blanc", descrizione: "Purée de châtaignes et crème fouettée", prezzo: "€ 8", veg: true },
-      ]},
-    ],
-    legenda: "V = plat végétarien",
-    nota: "Couvert 3 €. Informations sur les allergènes disponibles sur demande auprès du personnel.",
-    prenotaTitolo: "Réserver une table",
-    prenotaTesto: "Réservation conseillée, surtout le week-end et en haute saison.",
-    messaggioWhatsapp: "Bonjour ! Je voudrais réserver une table chez {nome}.",
-    oggettoEmail: "Réservation de table",
-  },
-
-  camere: {
-    titolo: "Les chambres",
-    intro: "Trois chambres chaleureuses et calmes, meublées en mélèze. Petit-déjeuner avec gâteaux maison inclus.",
-    elenco: [
-      { nome: "Chambre Dent du Géant", foto: "camera-1.jpg", descrizione: "Chambre double avec grande fenêtre sur le Mont-Blanc.", ospiti: "2 personnes", dotazioni: ["Vue Mont-Blanc", "Salle de bain privée", "Wi-Fi", "Petit-déjeuner inclus"], prezzo: "dès € 140 / nuit" },
-      { nome: "Suite Grandes Jorasses", foto: "camera-2.jpg", descrizione: "Suite sur deux niveaux avec coin salon, idéale pour les familles.", ospiti: "jusqu'à 4 personnes", dotazioni: ["Salon", "Baignoire", "Wi-Fi", "Petit-déjeuner inclus"], prezzo: "dès € 220 / nuit" },
-      { nome: "Chambre Val Ferret", foto: "camera-3.jpg", descrizione: "Chambre double avec balcon privé donnant sur la forêt.", ospiti: "2 personnes", dotazioni: ["Balcon", "Salle de bain privée", "Wi-Fi", "Petit-déjeuner inclus"], prezzo: "dès € 160 / nuit" },
-    ],
-    pulsante: "Vérifier les disponibilités",
-    oggettoEmail: "Demande de disponibilité – {camera}",
-    corpoEmail: "Bonjour, je voudrais savoir si la {camera} est disponible.\nDates d'arrivée et de départ : \nNombre de personnes : \n",
-    nota: "Taxe de séjour non incluse. Arrivée à partir de 15 h, départ avant 10 h 30.",
-  },
-
-  catalogo: {
-    titolo: "La boutique",
-    intro: "Les produits de nos fournisseurs de confiance, à emporter ou à offrir.",
-    tutti: "Tous",
-    prodotti: [
-      { nome: "Fontina AOP d'alpage", categoria: "Fromages", prezzo: "€ 24 / kg", foto: "prodotto-1.jpg", descrizione: "Affinée au moins 5 mois en grotte." },
-      { nome: "Lard d'Arnad AOP", categoria: "Charcuterie", prezzo: "€ 9 / 200 g", foto: "prodotto-2.jpg", descrizione: "Aromatisé aux herbes de montagne." },
-      { nome: "Mocetta", categoria: "Charcuterie", prezzo: "€ 8 / 150 g", foto: "prodotto-3.jpg", descrizione: "Charcuterie typique, séchée à l'air de la montagne." },
-      { nome: "Génépi artisanal", categoria: "Liqueurs", prezzo: "€ 22 / 50 cl", foto: "prodotto-4.jpg", descrizione: "Liqueur d'herbes alpines, recette de famille." },
-      { nome: "Miel toutes fleurs de montagne", categoria: "Douceurs", prezzo: "€ 9 / 500 g", foto: "prodotto-5.jpg", descrizione: "Récolté au-dessus de 1 500 mètres." },
-      { nome: "Tuiles valdôtaines", categoria: "Douceurs", prezzo: "€ 7 / 200 g", foto: "prodotto-6.jpg", descrizione: "Biscuits fins aux amandes et noisettes." },
-    ],
-    pulsante: "Demander des infos",
-    messaggioWhatsapp: "Bonjour ! Je voudrais des informations sur : {prodotto}",
-    nota: "Prix TTC. Vente uniquement en boutique : aucun paiement en ligne.",
-  },
-
-  listino: {
-    titolo: "Expériences et services",
-    intro: "Avec des partenaires de confiance, nous organisons quelques expériences pour nos hôtes.",
-    voci: [
-      { nome: "Dîner dégustation", descrizione: "Six plats accordés avec des vins valdôtains", durata: "3 heures", prezzo: "€ 75 par personne" },
-      { nome: "Randonnée en raquettes guidée", descrizione: "Sortie en raquettes au Val Ferret, matériel inclus", durata: "demi-journée", prezzo: "€ 55 par personne" },
-      { nome: "Transfert depuis/vers Aoste", descrizione: "Navette sur réservation", durata: "45 minutes", prezzo: "€ 60 le trajet" },
-    ],
-    nota: "Prix indicatifs, à confirmer lors de la réservation.",
-  },
-
-  faq: {
-    titolo: "Questions fréquentes",
-    domande: [
-      { domanda: "Faut-il réserver ?", risposta: "Pour le restaurant, c'est conseillé, surtout le samedi et en haute saison. Pour les chambres, toujours." },
-      { domanda: "Proposez-vous des plats végétariens ou sans gluten ?", risposta: "Oui : les plats végétariens sont signalés par un V sur le menu. En cas d'intolérance ou de maladie cœliaque, prévenez-nous lors de la réservation." },
-      { domanda: "Y a-t-il un parking ?", risposta: "Oui, nous disposons d'un parking privé gratuit pour les clients du restaurant et des chambres." },
-      { domanda: "Les animaux sont-ils acceptés ?", risposta: "Les chiens de petite taille sont les bienvenus en salle et dans l'une des chambres, sur demande." },
-      { domanda: "Comment venir sans voiture ?", risposta: "À 10 minutes à pied du centre de {citta} ; en hiver, le skibus gratuit s'arrête juste devant." },
-    ],
-  },
-
-  galleria: {
-    etichetta: "{nome}",
-    titolo: "Galerie",
-    intro: "Un aperçu de la maison, de la cuisine et des montagnes qui nous entourent. Touchez une photo pour l'agrandir.",
-    // Una descrizione per ogni foto, nello STESSO ORDINE delle foto in dati-cliente.js.
-    // Le descrizioni qui sotto raccontano le foto della demo (vedi FOTO-CREDITI.md).
-    // Quando cambi le foto, RISCRIVILE: servono anche come testo alternativo per chi non vede l'immagine.
-    descrizioni: [
-      "Le Mont-Blanc se reflétant dans un lac d’altitude",
-      "Le télésiège au-dessus des pistes enneigées",
-      "Une planche de fromages valdôtains et un verre de vin rouge",
-      "La cheminée en pierre de la salle, allumée les soirs d'hiver",
-      "La table en bois dressée pour le dîner",
-      "La terrasse avec vue sur les montagnes",
-      "Une chambre avec sa fenêtre sur les sommets",
-      "Les forêts de mélèzes en automne, au-dessus de la vallée",
-      "Les pots de miel de montagne sur les étagères de la boutique",
-    ],
-  },
-
-  contatti: {
-    etichetta: "{nome}",
-    titolo: "Contact",
-    intro: "Appelez-nous, écrivez-nous sur WhatsApp ou remplissez le formulaire : nous répondons sous 24 heures.",
-    infoTitolo: "Où et quand",
-    mappaTitolo: "Comment venir",
+  alt: {
+    "torino-tetti": "Tetti di Torino visti dall'alto, con la collina sullo sfondo",
+    "torino-mole": "Torino di notte con la Mole Antonelliana illuminata",
+    "torino-panorama": "Panorama di Torino con la collina e il cielo azzurro",
+    "fotovoltaico-tetto": "Pannelli fotovoltaici sul tetto di una casa, cielo azzurro",
+    "casa-fotovoltaico": "Casa in legno di montagna con pannelli fotovoltaici sul tetto",
+    "ingegnere-pannelli": "Tecnico con casco e gilet in mezzo a un campo di pannelli solari",
+    "ingegneri-progetto": "Due tecnici discutono un progetto steso su un tavolo",
+    "termocamera": "Termocamera che mostra le zone calde e fredde",
+    "condominio-facciate": "Facciate di un condominio con molti balconi",
+    "condominio-balconi": "Condominio moderno con balconi e piante",
+    "progetto-tavolo": "Tavole di progetto, righello e casco da cantiere su un tavolo",
+    "valvola": "Mano che regola la valvola termostatica di un termosifone",
+    "estintore": "Estintore rosso appeso a una parete di cemento",
+    "cappotto": "Posa di pannelli isolanti in una parete",
+    "ing-natale-lombardo": "Ritratto dell'ing. Natale Lombardo",
   },
 
   form: {
-    titolo: "Écrivez-nous",
-    nome: "Nom et prénom",
-    email: "E-mail",
-    telefono: "Téléphone",
-    facoltativo: "facultatif",
-    motivo: "Objet du message",
-    motivi: ["Informations", "Réservation de table", "Disponibilité des chambres", "Boutique et produits", "Autre"],
-    messaggio: "Message",
-    privacy: "J'ai lu la {linkPrivacy} et j'accepte le traitement de mes données afin de recevoir une réponse.",
-    privacyLink: "politique de confidentialité",
-    invia: "Envoyer le message",
-    obbligatori: "Les champs marqués d'un * sont obligatoires.",
+    nome: "Nome e cognome", email: "Email", telefono: "Telefono", servizio: "Servizio", scegli: "Scegli…",
+    servizi: [["ape", "Certificazione energetica (APE)"], ["diagnosi", "Diagnosi energetica"], ["solare", "Impianto solare"], ["bonus", "Bonus e detrazioni"], ["condominio", "Condominio"], ["antincendio", "Prevenzione incendi"], ["studi", "Collaborazione per studi tecnici"], ["altro", "Altro"]],
+    immobile: "Tipo di immobile", immobili: [["appartamento", "Appartamento"], ["casa", "Casa indipendente"], ["condominio", "Condominio"], ["attivita", "Negozio, ufficio o attività"], ["altro", "Altro"]],
+    comune: "Comune dell'immobile", messaggio: "Messaggio", messaggioAiuto: "Raccontaci in due righe cosa ti serve",
+    privacy: "Ho letto l'{link} e acconsento al trattamento dei miei dati per ricevere una risposta.", privacyLink: "informativa privacy",
+    invia: "Invia la richiesta", obbligatori: "* campi obbligatori.", notaMail: "Si aprirà il tuo programma di posta con il messaggio già pronto.",
+    errore: "Controlla i campi segnati: nome, email, servizio e consenso privacy sono obbligatori.",
+    trappola: "Lascia vuoto questo campo", oggettoEmail: "Richiesta di preventivo dal sito StudioVela49",
   },
 
-  grazie: {
-    titolo: "Merci, message bien reçu !",
-    testo: "Nous vous répondrons dès que possible, en général sous 24 heures. En cas d'urgence, appelez-nous.",
-    torna: "Retour à l'accueil",
+  confronto: {
+    esempio: "Un esempio",
+    a: { nome: "Appartamento 1 · 70 m²", chi: "Due pensionati, a casa quasi tutto il giorno", consumo: "consumo reale alto" },
+    b: { nome: "Appartamento 2 · 70 m²", chi: "Un giovane che lavora, a casa poche ore", consumo: "consumo reale basso" },
+    ape: "Classe sull'APE", reale: "Consumo reale (diagnosi)", stessaClasse: "stessa classe per entrambi",
+    nota: "Stesso palazzo, stesso piano, stessa classe. L'APE usa un uso standard e li vede uguali; la diagnosi guarda come vivi davvero.",
   },
 
-  errore: {
-    titolo: "Page introuvable",
-    testo: "Le lien est peut-être erroné ou la page a été déplacée.",
-    torna: "Retour à l'accueil",
+  home: {
+    apertura: { eti: "Ingegneria energetica · Torino", titolo: "La tua casa, misurata da un ingegnere.", frase: "APE, diagnosi energetiche, impianti solari e pratiche per i bonus. Veniamo sempre a vedere l'immobile.", cta: "Richiedi un preventivo" },
+    pubblici: {
+      privati: { eti: "Per i privati", titolo: "Casa tua, senza sorprese.", frase: "Vendi, affitti o vuoi spendere meno in bolletta? Ti diciamo cosa serve e lo facciamo noi.", voci: ["ape", "diagnosi", "solare", "bonus"], cta: ["ape", "Richiedi il preventivo per l'APE"] },
+      professionisti: { eti: "Per i professionisti", titolo: "Un solo riferimento tecnico.", frase: "Amministratori, studi tecnici e attività soggette ad antincendio: un ingegnere che segue tutto, con una telefonata.", voci: ["condominio", "antincendio", "studi"], cta: ["condominio", "Fissa un incontro"] },
+    },
+    griglia: {
+      eti: "Servizi", titolo: "Sette servizi, un solo studio.", frase: "Dal certificato per vendere casa al supporto in assemblea di condominio.",
+      schede: [
+        { k: "ape", forma: "grande", foto: "torino-tetti", frase: "Per vendere, affittare o dopo i lavori. Valido fino a 10 anni, sempre con sopralluogo." },
+        { k: "diagnosi", forma: "alta scheda--scura", frase: "I consumi reali della tua casa e gli interventi che convengono davvero." },
+        { k: "bonus", forma: "normale scheda--ambra", frase: "Verifichiamo i bonus per il tuo caso e seguiamo la pratica." },
+        { k: "solare", forma: "normale", frase: "Fotovoltaico e solare termico: fattibilità, scelta, pratiche." },
+        { k: "condominio", forma: "larga", frase: "Assemblee, contabilizzazione del calore, confronto dei preventivi." },
+        { k: "antincendio", forma: "normale", frase: "SCIA e pratiche con un professionista antincendio abilitato." },
+        { k: "studi", forma: "normale", frase: "Legge 10, catasto, rilievi e bandi per il tuo studio." },
+      ],
+    },
+    passi: {
+      eti: "Come funziona", titolo: "Tre passi, nessuna sorpresa.",
+      voci: [
+        { titolo: "Ci racconti cosa ti serve", testo: "Chiami, scrivi o compili il modulo. Ti rispondiamo con un preventivo chiaro. Tempi di risposta [DA CONFERMARE]." },
+        { titolo: "Veniamo a vedere l'immobile", testo: "Sempre. Un certificato serio nasce da un rilievo vero, non da una foto mandata per email." },
+        { titolo: "Ricevi il documento e lo capisci", testo: "Ti consegniamo il lavoro e ti spieghiamo cosa significa e cosa conviene fare." },
+      ],
+    },
+    confronto: { eti: "APE o diagnosi?", titolo: "Stessa casa, bollette diverse.", frase: "Due appartamenti identici hanno la stessa classe sull'APE. Ma chi ci vive li usa in modo diverso.", link: "Scopri la diagnosi energetica" },
+    perche: {
+      eti: "Perché sceglierci", titolo: "Un ingegnere, non un modulo online.",
+      voci: [
+        { titolo: "Sempre con sopralluogo", testo: "Non firmiamo certificati senza aver visto l'immobile. È la nostra regola da sempre." },
+        { titolo: "Un unico riferimento", testo: "Energia, pratiche, antincendio: parli con una persona sola, che segue tutto." },
+        { titolo: "Iscritto all'Ordine degli Ingegneri di Torino", testo: "E certificatore energetico iscritto all'elenco della Regione Piemonte. Numeri di iscrizione [DA CONFERMARE]." },
+        { titolo: "Professionista antincendio abilitato", testo: "Abilitazione del Ministero dell'Interno per le pratiche di prevenzione incendi." },
+        { titolo: "Formato al Politecnico di Torino", testo: "Laurea in Ingegneria Civile, con una tesi sul bilancio energetico degli edifici." },
+      ],
+    },
+    valori: { eti: "Cosa ci guida", parole: ["Professionalità", "Trasparenza", "Disponibilità", "Concretezza"], frase: "Quattro parole che nel 2010 erano il nostro motto. Lo sono ancora." },
+    persona: { eti: "Chi c'è dietro", titolo: "Ing. Natale Lombardo", testo: "Ingegnere civile, dal 2010 guida StudioVela49 in Via Vela 49. Si occupa di risparmio energetico di edifici e impianti, dal progetto alla pratica.", link: "Conosci lo studio" },
+    faq: {
+      eti: "Domande frequenti", titolo: "Le domande che ci fanno più spesso.",
+      voci: [
+        { d: "Mi serve l'APE per vendere o affittare casa?", r: "Sì. L'APE serve per vendere o affittare un immobile, per le nuove costruzioni e dopo una ristrutturazione importante. Va allegato al contratto di vendita e consegnato all'inquilino." },
+        { d: "Quanto dura un APE?", r: "Fino a 10 anni dal rilascio. Va aggiornato prima se fai lavori che cambiano le prestazioni energetiche dell'edificio o dell'impianto." },
+        { d: "Che differenza c'è tra APE e diagnosi energetica?", r: "L'APE calcola i consumi con un uso standard, così tutti gli edifici si possono confrontare. La diagnosi calcola i consumi reali, in base a come vivi la casa, e ti dice quali interventi convengono." },
+        { d: "Fate il certificato senza venire a vedere la casa?", r: "No. Ogni APE nasce da un sopralluogo nell'immobile. Solo così il documento ha un valore tecnico vero." },
+        { d: "Quanto costa e quanto tempo ci vuole?", r: "Dipende dall'immobile: ti mandiamo un preventivo chiaro prima di iniziare. Prezzi e tempi medi [DA CONFERMARE]." },
+        { d: "In quale zona lavorate?", r: "Lo studio è a Torino, in Via V. Vela 49. Zona servita [DA CONFERMARE]." },
+      ],
+    },
+    finale: { titolo: "Raccontaci il tuo immobile.", frase: "Ti rispondiamo con un preventivo chiaro. Nessun impegno." },
+  },
+
+  servizi: {
+    titolo: "Cosa facciamo.", frase: "Sette servizi per chi vive una casa e per chi la gestisce. Scegli il tuo.",
+    privati: "Per chi vende, affitta o vuole spendere meno", professionisti: "Per amministratori, studi tecnici e attività",
+    altriTitolo: "Altri servizi, con i nostri collaboratori",
+    altri: ["Consulenza catastale", "Rilievi planovolumetrici", "Linee vita e dispositivi anticaduta", "Progettazione e direzione lavori per ristrutturazioni"],
+    altriNota: "Servizi ancora attivi oggi [DA CONFERMARE].",
+    finaleTitolo: "Non sai quale servizio ti serve?", finaleFrase: "Scrivici cosa devi fare: ti diciamo noi da dove partire.",
+  },
+
+  ape: {
+    riassunto: "Per vendere, affittare o dopo i lavori.",
+    titolo: "Devi vendere o affittare casa? Ti serve l'APE.",
+    frase: "Veniamo a vedere l'immobile, rileviamo tutto e ti consegniamo l'Attestato di Prestazione Energetica, valido fino a 10 anni. Tempi di consegna [DA CONFERMARE].",
+    cta: "Richiedi il preventivo per l'APE", scalaAlt: "Scala delle classi energetiche, da A4 (la migliore) a G (la peggiore)",
+    quando: {
+      eti: "Quando serve", titolo: "Quattro casi in cui è obbligatorio.",
+      voci: [
+        { titolo: "Vendi", testo: "L'APE va allegato all'atto di vendita, a cura di chi vende." },
+        { titolo: "Affitti", testo: "Lo consegni all'inquilino quando firmate il contratto." },
+        { titolo: "Costruisci", testo: "Ogni edificio nuovo deve avere il suo attestato." },
+        { titolo: "Ristrutturi", testo: "Dopo lavori importanti la classe va ricalcolata." },
+      ],
+    },
+    sopralluogo: { eti: "La nostra regola", titolo: "Nessun APE senza sopralluogo.", frase: "Non redigiamo certificati senza aver visto l'immobile. Solo un rilievo attento della tua casa dà un documento con un fondamento tecnico, che ti aiuta anche a capire come migliorarla." },
+    preparare: {
+      eti: "Prima del sopralluogo", titolo: "Cosa tenere a portata di mano.", frase: "Ti diciamo noi cosa serve per il tuo caso. Di solito aiutano questi documenti. Elenco [DA CONFERMARE].",
+      voci: ["Dati catastali dell'immobile", "Planimetria", "Libretto dell'impianto di riscaldamento", "Eventuali lavori fatti di recente (infissi, caldaia, isolamento)"],
+    },
+    faq: [
+      { d: "Chi deve fare l'APE?", r: "Un certificatore energetico iscritto all'elenco regionale. Lo studio si avvale di certificatori iscritti all'albo della Regione Piemonte." },
+      { d: "Per quanto tempo vale?", r: "Fino a 10 anni dal rilascio, se nel frattempo non fai lavori che cambiano le prestazioni energetiche dell'immobile." },
+      { d: "Perché il sopralluogo è così importante?", r: "Perché i dati veri (muri, infissi, impianto) cambiano la classe. Un certificato fatto a distanza rischia di essere sbagliato e di non aiutarti a migliorare." },
+      { d: "Quanto costa l'APE?", r: "Dipende da tipo e dimensione dell'immobile. Ti mandiamo un preventivo prima di iniziare. Prezzi indicativi [DA CONFERMARE]." },
+    ],
+    finaleTitolo: "Richiedi il preventivo per l'APE.", finaleFrase: "Dicci dove si trova l'immobile e per cosa ti serve: vendita, affitto o lavori.",
+  },
+
+  diagnosi: {
+    riassunto: "I consumi reali e gli interventi che convengono.",
+    titolo: "Stessa casa, bollette diverse.",
+    frase: "La diagnosi energetica calcola quanto consuma davvero la tua casa o la tua azienda, in base a come la usi. È il punto di partenza per qualsiasi lavoro di risparmio.",
+    cta: "Prenota un sopralluogo",
+    ottieni: {
+      eti: "Cosa ottieni", titolo: "Una mappa per spendere meno.",
+      voci: [
+        { titolo: "Sopralluogo e intervista", testo: "Veniamo da te, guardiamo edificio e impianti e ti chiediamo come vivi gli spazi." },
+        { titolo: "I punti deboli", testo: "Dove l'energia si perde: involucro, infissi, impianto, abitudini." },
+        { titolo: "Interventi simulati", testo: "Proviamo a calcolo le soluzioni possibili prima di spendere un euro." },
+        { titolo: "Costi e benefici", testo: "Per ogni intervento, quanto costa e quanto ti fa risparmiare. Scegli tu." },
+      ],
+    },
+    citazione: "Il risparmio energetico è un percorso, e la sua lunghezza sono i costi. Una buona diagnosi è la segnaletica che ti indica la strada più breve.",
+    faq: [
+      { d: "La diagnosi sostituisce l'APE?", r: "No, sono due documenti diversi. L'APE è obbligatorio per vendere o affittare; la diagnosi è uno studio dei consumi reali, utile prima di fare lavori." },
+      { d: "Vale anche per le aziende?", r: "Sì. Due aziende uguali possono consumare in modo molto diverso, per esempio se hanno macchinari che scaldano gli ambienti o processi con esigenze particolari." },
+      { d: "Quando conviene farla?", r: "Prima di una riqualificazione energetica: ti evita di spendere in interventi che rendono poco." },
+    ],
+    finaleTitolo: "Prenota un sopralluogo per la diagnosi.", finaleFrase: "Raccontaci com'è la casa o l'azienda e cosa vorresti migliorare.",
+  },
+
+  solare: {
+    riassunto: "Fotovoltaico e solare termico, dalla fattibilità agli incentivi.",
+    numero: "1.100–1.600", unita: "kWh per m² all'anno di energia dal sole",
+    titolo: "Energia che arriva gratis. Va solo raccolta bene.",
+    frase: "Ti aiutiamo a capire se un impianto fotovoltaico o solare termico conviene davvero sul tuo tetto, e ti seguiamo fino alle pratiche.",
+    cta: "Valuta il tuo impianto",
+    fasi: {
+      eti: "Come ti seguiamo", titolo: "Dal tetto alla pratica.",
+      voci: [
+        { titolo: "Fattibilità", testo: "Studiamo il tuo caso: è tecnicamente possibile? Conviene economicamente?" },
+        { titolo: "Scelta dell'impianto", testo: "Fotovoltaico, solare termico o entrambi: la soluzione giusta per i tuoi consumi." },
+        { titolo: "Pratiche", testo: "Prepariamo le pratiche per installare e far funzionare l'impianto." },
+        { titolo: "Incentivi", testo: "Verifichiamo gli incentivi disponibili oggi e prepariamo la richiesta. Incentivi seguiti [DA CONFERMARE]." },
+      ],
+    },
+    dogane: {
+      eti: "Impianti oltre 20 kWp", titolo: "Le pratiche con l'Agenzia delle Dogane.",
+      frase: "Gli impianti fotovoltaici più grandi hanno obblighi in più. Li gestiamo noi. Servizio ancora attivo [DA CONFERMARE].",
+      voci: ["Denuncia di officina elettrica", "Dichiarazione annuale di produzione", "Tenuta dei registri", "Verifica e recupero delle accise non dovute"],
+    },
+    finaleTitolo: "Valuta il tuo impianto solare.", finaleFrase: "Dicci dove si trova l'edificio e che tipo di tetto ha: partiamo da lì.",
+  },
+
+  bonus: {
+    riassunto: "Verifichiamo i bonus per i tuoi lavori e seguiamo la pratica.",
+    titolo: "Le regole cambiano spesso. Verifichiamo noi.",
+    frase: "Bonus e detrazioni per la casa cambiano quasi ogni anno. Ti diciamo quali valgono oggi per i tuoi lavori e seguiamo la pratica dall'inizio alla fine.",
+    cta: "Verifica il tuo bonus",
+    come: {
+      eti: "Cosa facciamo", titolo: "Dalla scelta dei lavori all'ultimo documento.", frase: "Puoi chiamarci prima di decidere o quando i lavori sono già partiti.",
+      voci: [
+        { titolo: "Scegli l'intervento giusto", testo: "Ti aiutiamo a capire quali lavori convengono e rientrano nei bonus." },
+        { titolo: "Confrontiamo i preventivi", testo: "Leggiamo le offerte delle ditte e ti diciamo qual è la migliore, tecnicamente." },
+        { titolo: "Seguiamo la pratica", testo: "Prepariamo la documentazione tecnica per chiedere la detrazione." },
+        { titolo: "APE dopo i lavori", testo: "Se serve, redigiamo l'attestato energetico a fine intervento." },
+      ],
+    },
+    quali: {
+      eti: "Quali bonus", titolo: "Ecobonus, Bonus ristrutturazione, Conto Termico…",
+      frase: "Gli strumenti più comuni per chi migliora l'efficienza della casa. Percentuali, limiti e scadenze cambiano: le verifichiamo sul tuo caso, al momento giusto.",
+      voci: ["Ecobonus", "Bonus ristrutturazione", "Conto Termico"],
+      nota: "Bonus che lo studio segue oggi [DA CONFERMARE].",
+    },
+    parcella: { titolo: "Anche la parcella del tecnico può essere detraibile.", frase: "Di norma le spese professionali necessarie per i lavori e per la certificazione rientrano nella detrazione. Lo verifichiamo insieme per la tua pratica." },
+    faq: [
+      { d: "Quali percentuali di detrazione ci sono oggi?", r: "Dipende dal tipo di lavoro, dall'immobile e dall'anno in cui paghi. Le regole cambiano spesso: per questo le verifichiamo sul tuo caso prima di partire." },
+      { d: "Posso chiamarvi quando i lavori sono già iniziati?", r: "Sì, ma prima è meglio: alcune pratiche vanno impostate prima di iniziare i lavori." },
+      { d: "Serve l'APE per i bonus?", r: "Per alcuni interventi sì, a fine lavori. Te lo diciamo noi e, se serve, lo redigiamo." },
+    ],
+    finaleTitolo: "Verifica il tuo bonus.", finaleFrase: "Dicci che lavori vuoi fare e dove: ti diciamo quali bonus valgono per te.",
+  },
+
+  condominio: {
+    riassunto: "Un unico riferimento tecnico per l'amministratore.",
+    titolo: "Un solo riferimento per ogni aspetto tecnico del condominio.",
+    frase: "Gestire un condominio è sempre più complesso. Ti affianchiamo su tutto ciò che è tecnico, così tu puoi occuparti del resto.",
+    cta: "Fissa un incontro",
+    schema: { eti: "Come lavoriamo", titolo: "Una telefonata, un incontro. Il resto lo seguiamo noi.", amministratore: "Amministratore", altri: ["Assemblea", "Ditte", "Condòmini"], nota: "Facciamo da tramite tra amministratore e ditte, per tenere sotto controllo ogni lavoro tecnico." },
+    cosa: {
+      eti: "Cosa facciamo", titolo: "Il supporto tecnico che ti serve.",
+      voci: [
+        { titolo: "Presenza in assemblea", testo: "Spieghiamo ai condòmini, con parole semplici, gli aspetti tecnici degli interventi." },
+        { titolo: "Contabilizzazione del calore", testo: "Ti seguiamo sulla ripartizione dei consumi di riscaldamento." },
+        { titolo: "Risparmio energetico", testo: "Valutiamo gli interventi sull'edificio e sugli impianti comuni." },
+        { titolo: "Raccolta e confronto dei preventivi", testo: "Raccogliamo le proposte delle ditte e aiutiamo l'assemblea a scegliere la migliore." },
+      ],
+    },
+    citazione: "Quando tutti puntano al massimo ribasso, solo una buona organizzazione mantiene alta la qualità ed evita sorprese.",
+    finaleTitolo: "Fissa un incontro per il tuo condominio.", finaleFrase: "Dicci quanti condomini gestisci e su cosa ti serve supporto.",
+  },
+
+  antincendio: {
+    riassunto: "SCIA, progetti e certificazioni antincendio.",
+    eti: "Professionista antincendio abilitato",
+    titolo: "Prevenzione incendi, con la firma giusta.",
+    frase: "Le pratiche antincendio può firmarle solo un professionista abilitato dal Ministero dell'Interno. L'ing. Lombardo lo è.",
+    cta: "Richiedi una consulenza",
+    cosa: {
+      titolo: "Cosa possiamo fare per te.",
+      testi: [
+        "Alcune attività, per tipo e dimensione, sono soggette ai controlli di prevenzione incendi dei Vigili del Fuoco.",
+        "Per queste attività servono progetti e pratiche firmate da un professionista antincendio iscritto negli elenchi del Ministero, che si aggiorna ogni cinque anni.",
+        "Ci occupiamo di qualsiasi pratica in materia antincendio: studio degli spazi, vie di esodo, resistenza al fuoco delle strutture, sistemi di protezione.",
+      ],
+      voci: [{ titolo: "SCIA antincendio" }, { titolo: "Progetti di prevenzione incendi" }, { titolo: "Certificazioni su impianti e strutture" }, { titolo: "Consulenza per le attività soggette" }],
+    },
+    finaleTitolo: "Richiedi una consulenza antincendio.", finaleFrase: "Dicci che attività hai e dove si trova: ti diciamo quali pratiche servono.",
+  },
+
+  studi: {
+    riassunto: "Legge 10, catasto, rilievi, bandi e progettazione sostenibile.",
+    titolo: "Lavoriamo insieme al tuo progetto.",
+    frase: "Per studi tecnici e liberi professionisti che hanno bisogno di un partner sull'energia. Le cose fatte bene partono nel modo giusto.",
+    cta: "Proponi una collaborazione",
+    voci: ["Consulenza per la progettazione sostenibile", "Consulenza tecnica per bandi e finanziamenti pubblici", "Rilievi planovolumetrici", "Servizi catastali", "Relazione tecnica ex Legge 10", "Pratiche doganali per impianti fotovoltaici e recupero delle accise non dovute"],
+    come: {
+      eti: "Come collaboriamo", titolo: "Entriamo nel tuo team, non al posto tuo.",
+      testi: ["Mettiamo a disposizione competenze ed esperienza sull'energia per i progetti che richiedono più discipline.", "Ci integriamo rapidamente nel gruppo di lavoro: ognuno fa al meglio la sua parte e il cliente finale ottiene un servizio più veloce."],
+      nota: "Modalità di collaborazione e compensi [DA CONFERMARE].",
+    },
+    finaleTitolo: "Proponi una collaborazione.", finaleFrase: "Raccontaci il progetto e in cosa possiamo esserti utili.",
+  },
+
+  chiSiamo: {
+    ruolo: "Ingegnere civile, titolare dello studio",
+    titolo: "Dal 2010 in Via Vela 49, a Torino.",
+    frase: "Uno studio di ingegneria che lavora per edifici più sostenibili: per l'ambiente e per i costi di gestione.",
+    profilo: {
+      titolo: "Ing. Natale Lombardo",
+      testi: [
+        "Ingegnere civile laureato al Politecnico di Torino, con una tesi sul bilancio energetico e ambientale degli edifici pubblici e privati del Comune di Livorno Ferraris.",
+        "Dal 2007 al 2010 lavora in Onleco, società di consulenza e ricerca nata nell'incubatore di imprese innovative del Politecnico. Lì si occupa di certificazioni e diagnosi energetiche, studi di fattibilità per geotermico, solare termico e fotovoltaico, progetti in classe A e del bilancio energetico del Comune di Collegno.",
+        "Nel 2010 fonda StudioVela49. Il lavoro dello studio riguarda sia l'involucro degli edifici, nuovi ed esistenti, sia gli impianti: ridurre il fabbisogno di energia e produrla da fonti rinnovabili.",
+      ],
+    },
+    tappe: {
+      eti: "Le tappe", titolo: "Una strada sempre sull'energia.",
+      voci: [
+        { anno: "2007", testo: "Inizia in Onleco, spin-off nato nell'incubatore del Politecnico di Torino." },
+        { anno: "2008", testo: "Coadiutore nei laboratori del Politecnico (fino al 2010) e collaborazione alle linee guida per l'energia nel patrimonio culturale per il Ministero." },
+        { anno: "2010", testo: "Apre StudioVela49 in Via V. Vela 49, a Torino." },
+        { anno: "2014", testo: "Ottiene l'abilitazione di Professionista Antincendio dopo il corso ministeriale di 120 ore." },
+      ],
+    },
+    titoli: {
+      eti: "Iscrizioni e competenze", titolo: "Le carte in regola.",
+      voci: ["Iscritto all'Ordine degli Ingegneri della Provincia di Torino [DA CONFERMARE n.]", "Certificatore energetico iscritto all'elenco della Regione Piemonte [DA CONFERMARE n.]", "Professionista antincendio abilitato dal Ministero dell'Interno [DA CONFERMARE n.]", "Docenza al master \"Efficienza energetica e fonti rinnovabili\" (Vercelli, 2009)"],
+    },
+    rete: {
+      titolo: "Una rete di collaboratori esterni.",
+      testo: "Per catasto, rilievi, linee vita e anticaduta lo studio lavora con collaboratori esterni esperti nei singoli settori. Nomi dei collaboratori [DA CONFERMARE].",
+      strumentiEti: "Strumenti di calcolo",
+      strumenti: ["Edilclima", "Docet", "Solarius-PV", "Solarius-T", "CasaClima"],
+    },
+    finaleTitolo: "Parliamo del tuo progetto.", finaleFrase: "Una telefonata o un messaggio: ti rispondiamo noi, direttamente.",
+  },
+
+  contatti: {
+    titolo: "Richiedi un preventivo.",
+    frase: "Compila il modulo, chiama o scrivi. Ti rispondiamo con un preventivo chiaro, senza impegno.",
+    moduloTitolo: "Il modulo richiede un minuto.",
+    recapiti: "Recapiti dello studio",
+    orari: "[DA CONFERMARE] (anche se si riceve solo su appuntamento)",
+    arrivare: "Metro: fermata Vinzaglio. Linee bus [DA CONFERMARE].",
+    mappaTitolo: "Dove siamo",
+    mappaTesto: "La mappa è di Google Maps: la carichiamo solo se la chiedi, perché Google potrebbe usare dei cookie.",
+    mappaPulsante: "Mostra la mappa", mappaApri: "Apri in Google Maps",
   },
 
   privacy: {
-    titolo: "Confidentialité et cookies",
-    aggiornamento: "Dernière mise à jour : {data}",
+    titolo: "Informativa privacy",
+    aggiornamento: "Ultimo aggiornamento: 18/11/2026. Testo da far verificare al cliente [DA CONFERMARE].",
     sezioni: [
-      { titolo: "1. Qui traite vos données", testo: "Le responsable du traitement est <strong>{ragioneSociale}</strong>, {indirizzo}, N° TVA {piva}. Pour toute question sur vos données, écrivez à <a href=\"mailto:{email}\">{email}</a>." },
-      { titolo: "2. Quelles données nous collectons", testo: "<strong>Données de navigation :</strong> pour fonctionner et pour des raisons de sécurité, le serveur qui héberge le site enregistre des données techniques comme l'adresse IP, la date et l'heure de la visite et les pages demandées.<br><strong>Données que vous nous envoyez :</strong> si vous remplissez le formulaire de contact, nous collectons votre nom, votre e-mail, votre téléphone (facultatif) et votre message. Si vous nous écrivez par e-mail, téléphone ou WhatsApp, nous traitons les données que vous nous communiquez." },
-      { titolo: "3. Pourquoi nous les utilisons et sur quelle base", testo: "Nous utilisons vos données pour répondre à vos demandes d'informations, de devis ou de réservation (art. 6.1.b RGPD, mesures précontractuelles prises à votre demande) et pour protéger le site contre les abus (art. 6.1.f RGPD, intérêt légitime). La carte Google n'est chargée qu'avec votre consentement (art. 6.1.a RGPD). Nous n'utilisons pas vos données à des fins publicitaires et ne les vendons jamais." },
-      { titolo: "4. Suis-je obligé de fournir mes données ?", testo: "Non, mais sans votre nom, votre e-mail et votre message, nous ne pouvons pas vous répondre." },
-      { titolo: "5. Combien de temps nous les conservons", testo: "Les messages reçus via le site sont conservés le temps nécessaire au traitement de votre demande et au maximum 24 mois, sauf obligations légales (par exemple fiscales) si la demande aboutit à un contrat." },
-      { titolo: "6. À qui elles sont communiquées", testo: "Vos données peuvent être traitées par des prestataires qui nous aident à gérer le site, désignés comme sous-traitants : <strong>Netlify, Inc.</strong> (hébergement du site et réception des messages du formulaire). Si vous acceptez la carte, <strong>Google</strong> reçoit certaines données en tant que responsable de traitement indépendant. Si vous nous écrivez sur WhatsApp, le service est géré par WhatsApp/Meta. Netlify et Google peuvent transférer des données vers les États-Unis sur la base du Data Privacy Framework UE-États-Unis ou des Clauses Contractuelles Types approuvées par la Commission européenne." },
-      { titolo: "7. Vos droits", testo: "Vous pouvez à tout moment demander l'accès à vos données, leur rectification, leur effacement, la limitation de leur utilisation, leur portabilité, vous opposer au traitement et retirer votre consentement (art. 15 à 22 RGPD) en écrivant à <a href=\"mailto:{email}\">{email}</a>. Vous avez également le droit d'introduire une réclamation auprès de l'autorité italienne de protection des données (<a href=\"https://www.garanteprivacy.it\" rel=\"noopener\" target=\"_blank\">www.garanteprivacy.it</a>)." },
-      { titolo: "8. Cookies et technologies similaires", testo: "<strong>Outils techniques (toujours actifs) :</strong> le site enregistre uniquement votre choix concernant les cookies dans votre navigateur, pendant 6 mois. Aucun consentement n'est nécessaire. Nous n'utilisons ni cookies de profilage ni statistiques.<br><strong>Services tiers (uniquement avec consentement) :</strong> sur la page Contact, Google Maps ne se charge que si vous cliquez sur « Accepter » ou « Afficher la carte ». Google peut alors déposer des cookies et collecter des données selon sa propre <a href=\"https://policies.google.com/privacy?hl=fr\" rel=\"noopener\" target=\"_blank\">politique de confidentialité</a>.<br><strong>Liens externes :</strong> les liens vers Instagram, Facebook ou WhatsApp ne chargent rien tant que vous ne cliquez pas dessus." },
-      { titolo: "9. Comment modifier votre choix", testo: "Vous pouvez changer d'avis à tout moment grâce au lien « Préférences cookies » en bas de chaque page, ou en effaçant les données de votre navigateur." },
+      { titolo: "1. Chi tratta i tuoi dati", testo: "Il titolare del trattamento è StudioVela49 — Ing. Natale Lombardo, Via V. Vela 49, 10128 Torino (TO), P. IVA 10354130014, email <a href=\"mailto:info@studiovela49.it\">info@studiovela49.it</a>." },
+      { titolo: "2. Quali dati raccogliamo", testo: "Solo quelli che ci dai tu con il modulo, per email, telefono o WhatsApp: nome, email, telefono, servizio richiesto, tipo di immobile, comune e il testo del messaggio. Il sito non raccoglie altri dati su di te." },
+      { titolo: "3. Perché li usiamo", testo: "Per risponderti e preparare il preventivo che hai chiesto (art. 6.1.b GDPR, misure precontrattuali) e, se diventi cliente, per svolgere l'incarico e rispettare gli obblighi di legge, per esempio fiscali (art. 6.1.c GDPR). Non usiamo i tuoi dati per pubblicità e non li vendiamo." },
+      { titolo: "4. Per quanto tempo", testo: "Le richieste a cui non segue un incarico vengono cancellate entro 24 mesi [DA CONFERMARE]. I dati dei clienti si conservano per il tempo previsto dalla legge (di norma 10 anni per i documenti fiscali)." },
+      { titolo: "5. Chi può vederli", testo: "Lo studio e, solo se serve, i fornitori che ci aiutano a far funzionare il sito e la posta: il servizio che inoltra il modulo (Web3Forms o Formspree) [DA CONFERMARE quale], il fornitore dell'email e l'hosting del sito. Sono responsabili del trattamento e usano i dati solo per questo. Alcuni hanno sede fuori dall'Unione europea: in questo caso il trasferimento avviene con le garanzie previste dal GDPR (decisione di adeguatezza o clausole contrattuali standard)." },
+      { titolo: "6. Sei obbligato a darci i dati?", testo: "No, ma senza nome, email e servizio richiesto non possiamo risponderti." },
+      { titolo: "7. I tuoi diritti", testo: "Puoi chiedere in ogni momento di accedere ai tuoi dati, correggerli, cancellarli, limitarne l'uso, riceverli in un formato leggibile, opporti al trattamento e revocare il consenso (artt. 15-22 GDPR), scrivendo a <a href=\"mailto:info@studiovela49.it\">info@studiovela49.it</a>. Puoi anche presentare reclamo al Garante per la protezione dei dati personali (<a href=\"https://www.garanteprivacy.it\" rel=\"noopener\">www.garanteprivacy.it</a>)." },
+      { titolo: "8. Cookie", testo: "Il sito non usa cookie di profilazione né statistiche. I dettagli sono nella pagina Cookie." },
     ],
+  },
+
+  cookie: {
+    titolo: "Cookie policy",
+    aggiornamento: "Ultimo aggiornamento: 18/11/2026.",
+    sezioni: [
+      { titolo: "In breve", testo: "Questo sito non installa cookie: niente profilazione, niente statistiche, niente pubblicità. Per questo non ti chiediamo il consenso con un banner." },
+      { titolo: "Caratteri e foto", testo: "Caratteri tipografici, foto e script sono ospitati sul sito stesso: non vengono caricati da Google Fonts o da altri servizi esterni." },
+      { titolo: "La mappa", testo: "Nella pagina Contatti la mappa di Google Maps viene caricata solo se premi “Mostra la mappa”. Da quel momento Google può installare cookie e raccogliere dati secondo la sua <a href=\"https://policies.google.com/privacy?hl=it\" rel=\"noopener\">informativa</a>." },
+      { titolo: "Link esterni", testo: "I link a WhatsApp, Google Maps o Pexels portano su siti di altri, che hanno le loro regole sui cookie. Finché non ci clicchi, non caricano nulla." },
+      { titolo: "Il modulo", testo: "Quando invii il modulo, i dati passano al servizio che lo inoltra allo studio (Web3Forms o Formspree) [DA CONFERMARE quale]. Non usiamo cookie per questo." },
+    ],
+  },
+
+  crediti: {
+    titolo: "Crediti delle fotografie",
+    frase: "Le fotografie del sito vengono da Pexels e sono usate secondo la licenza Pexels. Grazie agli autori.",
+    colFoto: "Foto", colSoggetto: "Soggetto", colAutore: "Autore", colFonte: "Fonte",
+    nota: "Le persone ritratte in queste foto non fanno parte dello studio e non hanno approvato i suoi servizi. Le foto di lavori e cantieri sono illustrative. Il ritratto dell'ing. Lombardo è dello studio.",
+    fontTitolo: "Caratteri tipografici",
+    font: "Instrument Sans e Inter, con licenza SIL Open Font License 1.1, ospitati su questo sito.",
+  },
+
+  grazie: {
+    titolo: "Grazie, richiesta ricevuta.",
+    frase: "Ti rispondiamo il prima possibile con un preventivo chiaro. Tempi di risposta [DA CONFERMARE]. Se è urgente, chiama il +39 339 270 9272.",
+    mail: "Abbiamo preparato l'email nel tuo programma di posta: ricordati di premere Invia.",
+    torna: "Torna alla home",
+  },
+
+  errore: {
+    titolo: "Questa pagina non esiste.",
+    frase: "Forse l'indirizzo è cambiato con il nuovo sito. Riparti dalla home o dai servizi.",
+    altro: "Page not found · Page introuvable", altroLingua: "en",
+    torna: "Torna alla home",
   },
 };

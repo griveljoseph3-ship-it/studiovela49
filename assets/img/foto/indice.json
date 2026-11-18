@@ -1,0 +1,149 @@
+{
+  "fotovoltaico-tetto": {
+    "w": 2400,
+    "h": 3600,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "casa-fotovoltaico": {
+    "w": 2400,
+    "h": 1800,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "ingegnere-pannelli": {
+    "w": 2400,
+    "h": 1601,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "ingegneri-progetto": {
+    "w": 2400,
+    "h": 1601,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "termocamera": {
+    "w": 2400,
+    "h": 3600,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "condominio-facciate": {
+    "w": 2400,
+    "h": 3600,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "condominio-balconi": {
+    "w": 2400,
+    "h": 3600,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "progetto-tavolo": {
+    "w": 2400,
+    "h": 1600,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "torino-tetti": {
+    "w": 2400,
+    "h": 1603,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "torino-mole": {
+    "w": 2400,
+    "h": 1602,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "valvola": {
+    "w": 2400,
+    "h": 1594,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "estintore": {
+    "w": 2400,
+    "h": 3582,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "cappotto": {
+    "w": 2400,
+    "h": 1602,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "torino-panorama": {
+    "w": 2400,
+    "h": 1600,
+    "larghezze": [
+      480,
+      800,
+      1200,
+      1800
+    ]
+  },
+  "ing-natale-lombardo": {
+    "w": 280,
+    "h": 329,
+    "larghezze": [
+      280
+    ]
+  }
+}
